@@ -9,7 +9,7 @@ export default function Home() {
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const PASSWORD = 'cap611'; // 设置你的密码
+  const PASSWORD = '611'; // 设置你的密码
 
   const handleLogin = () => {
     if (inputPwd === PASSWORD) {
@@ -43,10 +43,12 @@ export default function Home() {
   if (!authenticated) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-6">
-        <h2 className="text-xl font-bold">Enter Access Password</h2>
+        <h2 className="text-xl font-bold mb-2">Access Required</h2>
+        <p className="text-sm text-gray-600">What is our cap number?</p>
         <input
           type="password"
-          className="border px-4 py-2 rounded"
+          placeholder="Enter your answer..."
+          className="border px-4 py-2 rounded mt-1"
           onChange={(e) => setInputPwd(e.target.value)}
         />
         <button
