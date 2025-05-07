@@ -27,7 +27,7 @@ export default function Home() {
     formData.append('file', file);
 
     try {
-      const res = await fetch('http://localhost:8000/extract', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/extract`, {
         method: 'POST',
         body: formData,
       });
@@ -64,14 +64,24 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-10 gap-4 font-sans">
       <h1 className="text-2xl font-bold">AI Pitch Deck Reader</h1>
-      <input
+      {/* <input
         type="file"
         accept=".pdf"
         onChange={(e) => setFile(e.target.files?.[0] || null)}
-      />
+      /> */}
+      <label className="cursor-pointer bg-white border border-gray-300 rounded-lg px-6 py-3 shadow-md hover:bg-gray-100 transition">
+        <span className="text-gray-800 font-medium">📄 Choose PDF File</span>
+        <input
+          type="file"
+          accept=".pdf"
+          onChange={(e) => setFile(e.target.files?.[0] || null)}
+          className="hidden"
+        />
+      </label>
+
       <button
         onClick={handleUpload}
-        className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800"
+        className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-lg font-semibold px-6 py-3 rounded-xl shadow-lg hover:scale-105 transition-transform duration-200"
       >
         {loading ? 'Uploading...' : 'Extract Text'}
       </button>
