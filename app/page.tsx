@@ -70,11 +70,15 @@ export default function Home() {
         onChange={(e) => setFile(e.target.files?.[0] || null)}
       /> */}
       <label className="cursor-pointer bg-white border border-gray-300 rounded-lg px-6 py-3 shadow-md hover:bg-gray-100 transition">
-        <span className="text-gray-800 font-medium">📄 Choose PDF File</span>
+        <span className="text-gray-800 font-medium"> {file ? `📄 ${file.name}` : '📄 Choose PDF File'}</span>
         <input
           type="file"
           accept=".pdf"
-          onChange={(e) => setFile(e.target.files?.[0] || null)}
+          onChange={(e) => {
+            const selectedFile = e.target.files?.[0] || null;
+            console.log("Selected file:", selectedFile);
+            setFile(selectedFile);
+          }}
           className="hidden"
         />
       </label>
