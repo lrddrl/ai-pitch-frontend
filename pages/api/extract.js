@@ -16,7 +16,7 @@ export const config = {
     // Set the backend API base URL depending on environment
     const targetBaseUrl = isDev
     ? 'http://192.168.1.234:8000' // Your real LAN IP
-    : 'http://ec2-18-116-52-101.us-east-2.compute.amazonaws.com:8000';
+    : 'http://3.145.47.251:8000';
 
     console.log('[Forwarding request to]:', `${targetBaseUrl}/extract`);
   
