@@ -18,14 +18,14 @@ export const config = {
     ? 'http://192.168.1.234:8000' // Your real LAN IP
     : 'http://3.21.31.199:8000/';
 
-    console.log('[Forwarding request to]:', `${targetBaseUrl}/extract`);
+    console.log('[Forwarding request to]:', `${targetBaseUrl}/score`);
   
     // Dynamically import node-fetch for server-side HTTP request
     const fetch = (await import('node-fetch')).default;
   
     try {
       // Forward the request to your backend API
-      const response = await fetch(`${targetBaseUrl}/extract`, {
+      const response = await fetch(`${targetBaseUrl}/score`, {
         method: 'POST',
         headers: {
           'Content-Type': req.headers['content-type'],

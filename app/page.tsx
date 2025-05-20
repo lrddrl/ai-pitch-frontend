@@ -6,10 +6,10 @@ export default function Home() {
   const [authenticated, setAuthenticated] = useState(false);
   const [inputPwd, setInputPwd] = useState('');
   const [file, setFile] = useState<File | null>(null);
-  const [text, setText] = useState('');
+  const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
-  const PASSWORD = '611'; // 设置你的密码
+  const PASSWORD = '611';
 
   const handleLogin = () => {
     if (inputPwd === PASSWORD) {
@@ -22,17 +22,18 @@ export default function Home() {
   const handleUpload = async () => {
     if (!file) return alert('Please select a PDF file');
     setLoading(true);
+    setResult(null);
 
     const formData = new FormData();
     formData.append('file', file);
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/extract`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/score`, {
         method: 'POST',
         body: formData,
       });
       const data = await res.json();
-      setText(data.text);
+      setResult(data);
     } catch (err) {
       alert('Failed to upload file');
     } finally {
@@ -62,36 +63,63 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-10 gap-4 font-sans">
-      <h1 className="text-2xl font-bold">AI Pitch Deck Reader</h1>
-      {/* <input
-        type="file"
-        accept=".pdf"
-        onChange={(e) => setFile(e.target.files?.[0] || null)}
-      /> */}
+    <div className="min-h-screen flex flex-col items-center justify-center p-10 gap-4 font-sans bg-gradient-to-br from-gray-50 to-indigo-100">
+      <h1 className="text-2xl font-bold mb-4">AI Pitch Deck Reader</h1>
       <label className="cursor-pointer bg-white border border-gray-300 rounded-lg px-6 py-3 shadow-md hover:bg-gray-100 transition">
-        <span className="text-gray-800 font-medium"> {file ? `📄 ${file.name}` : '📄 Choose PDF File'}</span>
+        <span className="text-gray-800 font-medium">
+          {file ? `📄 ${file.name}` : '📄 Choose PDF File'}
+        </span>
         <input
           type="file"
           accept=".pdf"
           onChange={(e) => {
             const selectedFile = e.target.files?.[0] || null;
-            console.log("Selected file:", selectedFile);
             setFile(selectedFile);
           }}
           className="hidden"
         />
       </label>
-
       <button
         onClick={handleUpload}
         className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-lg font-semibold px-6 py-3 rounded-xl shadow-lg hover:scale-105 transition-transform duration-200"
+        disabled={loading}
       >
-        {loading ? 'Uploading...' : 'Extract Text'}
+        {loading ? 'Uploading & Scoring...' : 'Extract & Score'}
       </button>
-      <pre className="mt-6 p-4 w-full max-w-3xl border rounded bg-gray-100 text-sm whitespace-pre-wrap">
-        {text}
-      </pre>
+
+      {/* Show result table */}
+      {result && !result.error && (
+        <div className="w-full max-w-2xl mt-6">
+          <h2 className="text-lg font-semibold mb-3 text-gray-700 text-center">
+            CFA Factor Scoring
+          </h2>
+          <table className="w-full border rounded-lg bg-white shadow">
+            <thead>
+              <tr className="bg-indigo-100">
+                <th className="py-2 px-3 border-b text-left">Factor</th>
+                <th className="py-2 px-3 border-b text-left">Grade</th>
+                <th className="py-2 px-3 border-b text-left">Justification</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(result).map(([factor, value]: any) => (
+                <tr key={factor} className="hover:bg-indigo-50 transition">
+                  <td className="py-2 px-3 font-medium">{factor}</td>
+                  <td className="py-2 px-3 text-indigo-600 font-bold">{value.Grade}</td>
+                  <td className="py-2 px-3">{value.Justification}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Show error if backend returns error */}
+      {result && result.error && (
+        <div className="mt-6 text-red-600 font-semibold">
+          Error: {result.error}
+        </div>
+      )}
     </div>
   );
 }
