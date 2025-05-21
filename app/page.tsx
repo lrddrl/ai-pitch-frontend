@@ -1,6 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import jsPDF from 'jspdf';
+
+
+
 
 export default function Home() {
   const [authenticated, setAuthenticated] = useState(false);
@@ -52,15 +56,71 @@ export default function Home() {
   return total.toFixed(1);
 };
 
-function generateReportText(scores: any) {
+function generateDetailedReport(scores: any, finalRec: string) {
   if (!scores) return '';
-  let text = '📘 Investment Analysis Report\n\n';
+
+  let report = `📘 Comprehensive Investment Analysis Report\n\n`;
+
   for (const [factor, data] of Object.entries(scores)) {
-    text += `🧩 ${factor} – Score: ${data.Score}/10\n${data.Justification}\n\n`;
+    report += `🧩 ${factor} – Score: ${data.Score}/10\n`;
+    if (data.Strengths) report += `Strengths: ${data.Strengths}\n`;
+    if (data.Concerns) report += `Concerns: ${data.Concerns}\n`;
+    report += `Justification: ${data.Justification}\n\n`;
   }
-  text += `📈 Total Score: ${calculateTotalScore()}\n`;
-  return text;
+
+  report += `📌 Final Recommendation:\n${finalRec || 'No recommendation provided.'}\n`;
+
+  return report;
 }
+
+const exportCsv = () => {
+  if (!result?.scores) return;
+  const headers = ['Factor', 'Score', 'Strengths', 'Concerns', 'Justification'];
+  const rows = Object.entries(result.scores).map(([factor, data]: any) => [
+    factor,
+    data.Score,
+    data.Strengths || '',
+    data.Concerns || '',
+    data.Justification || ''
+  ]);
+  let csvContent = headers.join(',') + '\n';
+  rows.forEach(row => {
+    csvContent += row.map(val => `"${val.replace(/"/g, '""')}"`).join(',') + '\n';
+  });
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', 'tca_scores.csv');
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+
+const exportPdf = () => {
+  if (!result) return;
+  const doc = new jsPDF();
+
+  const text = generateDetailedReport(result.scores, result.FinalRecommendation);
+
+  const pageHeight = doc.internal.pageSize.height;
+  const margin = 10;
+  let y = margin;
+
+  doc.setFontSize(12);
+  text.split('\n').forEach(line => {
+    if (y > pageHeight - margin) {
+      doc.addPage();
+      y = margin;
+    }
+    doc.text(line, margin, y);
+    y += 7;
+  });
+
+  doc.save('investment_report.pdf');
+};
 
 
   if (!authenticated) {
@@ -161,7 +221,26 @@ function generateReportText(scores: any) {
 
       {result && result.error && <div className="mt-6 text-red-600 font-semibold">Error: {result.error}</div>}
 
-      <pre>{generateReportText(result.scores)}</pre>
+     { result?.scores && <pre className="whitespace-pre-wrap bg-white p-6 rounded shadow mt-6 max-w-3xl font-mono text-gray-900">
+        {generateDetailedReport(result.scores, result.FinalRecommendation)}
+      </pre>}
+
+      <div className="flex gap-4 mt-4">
+      <button
+        className="bg-green-600 text-white px-4 py-2 rounded"
+        onClick={exportCsv}
+      >
+        Export Scores CSV
+      </button>
+      <button
+        className="bg-blue-600 text-white px-4 py-2 rounded"
+        onClick={exportPdf}
+      >
+        Export Report PDF
+      </button>
+    </div>
+
+
     </div>
   );
 }
