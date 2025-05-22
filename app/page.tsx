@@ -62,11 +62,12 @@ function generateDetailedReport(scores: any, finalRec: string) {
   let report = `📘 Comprehensive Investment Analysis Report\n\n`;
 
   for (const [factor, data] of Object.entries(scores)) {
-    report += `🧩 ${factor} – Score: ${data.Score}/10\n`;
-    if (data.Strengths) report += `Strengths: ${data.Strengths}\n`;
-    if (data.Concerns) report += `Concerns: ${data.Concerns}\n`;
-    report += `Justification: ${data.Justification}\n\n`;
-  }
+  const d = data as { Score: number; Strengths?: string; Concerns?: string; Justification: string };
+  report += `🧩 ${factor} – Score: ${d.Score}/10\n`;
+  if (d.Strengths) report += `Strengths: ${d.Strengths}\n`;
+  if (d.Concerns) report += `Concerns: ${d.Concerns}\n`;
+  report += `Justification: ${d.Justification}\n\n`;
+}
 
   report += `📌 Final Recommendation:\n${finalRec || 'No recommendation provided.'}\n`;
 
