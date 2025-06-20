@@ -1,7 +1,291 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ReactMarkdown from "react-markdown";
+
+
+interface ScoreItem {
+  Score?: number | null;
+  score?: number | null;
+  Color?: string;
+  color?: string;
+  Justification?: string;
+  justification?: string;
+}
+
+
+const categorizedPrompts: Record<string, { category: string; prompt: string }[]> = {
+  "Prompt Domain 1: Risk / Impact Analysis": [
+    {
+      "category": "Category 1.1 \u2013 Macro-Level Risk",
+      "prompt": "What macro-level risks could impact this startup, including political, technical, social or societal, environmental, legal, or ESG factors? Consider regulatory instability, shifting tech standards, or ESG liabilities that influence long-term sustainability."
+    },
+    {
+      "category": "Category 1.2 \u2013 Sector Valuation Comparison",
+      "prompt": "How does the startup's valuation compare to peers in the same industry and stage? Use comparable market comps, stage benchmarks, and growth-adjusted multiples to contextualize valuation. Focus on both revenue and EBITDA multiples where it makes sense."
+    },
+    {
+      "category": "Category 1.3 \u2013 Blind Spot Assessment",
+      "prompt": "What questions should be asked to uncover blind spots or risks not visible in current disclosures? Probe potential biases in traction data, overlooked market dynamics, or leadership gaps. What other companies could potentially use its resources to build an adjacency to its current business and compete?"
+    },
+    {
+      "category": "Category 1.4 \u2013 Score Optimization",
+      "prompt": "Which specific areas should the startup focus on to improve its overall evaluation score? Evaluate leadership depth, traction strength, product defensibility, product platform expansion to adjacent markets, or GTM clarity."
+    },
+    {
+      "category": "Category 1.5 \u2013 Success vs. Failure Predictors",
+      "prompt": "What leading indicators suggest this company is more likely to succeed or fail? Use predictive patterns across funding history, founder experience, market timing,strength of patent if it can be determined, and early traction. If it is a new to the world product, does the team have the wherewithal to succeed in building a brand?"
+    },
+    {
+      "category": "Category 1.6 \u2013 Angel Investor Risk",
+      "prompt": "What risks do angel investors introduce (e.g., governance misalignment, unrealistic exit pressure)? Review early investor rights, influence on cap table dynamics, or risk of over-mentorship."
+    }
+  ],
+  "Prompt Domain 2: Leadership & Team": [
+    {
+      "category": "Category 2.1 \u2013 Team Composition",
+      "prompt": "What is the overall composition of the leadership team, and how balanced are roles and responsibilities? Look for the team to have complementary skills and backgrounds in technical, commercial, and operational experience."
+    },
+    {
+      "category": "Category 2.2 \u2013 Board & Advisors",
+      "prompt": "Who sits on the board or advisory committee, and what strategic value do they add? Highlight domain expertise, network access, or track records in scaling startups."
+    },
+    {
+      "category": "Category 2.3 \u2013 KOL/Expert Involvement",
+      "prompt": "Can credible KOLs or domain experts support the company\u2019s development strategy? Especially critical for medtech or biotech evaluations."
+    },
+    {
+      "category": "Category 2.4 \u2013 Execution Alignment",
+      "prompt": "How well is the leadership team aligned with execution milestones and KPIs? Cross-check OKRs, prior project delivery timelines, and founder-operational focus."
+    },
+    {
+      "category": "Category 2.5 \u2013 Critical Hires",
+      "prompt": "Which key roles are unfilled, and how might that affect the company's go-to-market or scale-up ability?"
+    },
+    {
+      "category": "Category 2.6 \u2013 CEO Track Record",
+      "prompt": "Has the CEO, founding, or key members of the operational team successfully exited companies? Prior exit experience often correlates with better strategic foresight."
+    },
+    {
+      "category": "Category 2.7 \u2013 Team Cohesion",
+      "prompt": "Has this team worked together before? What is the level of collaboration and trust? Look for early signals from investor calls, founder narratives, or organizational transparency."
+    },
+    {
+      "category": "Category 2.8 \u2013 Board Dynamics",
+      "prompt": "What governance structures and voting rights exist at the board level? Identify any control risks or founder-board tension signals. Do the board members offer skills to support the company\u2019s goals?"
+    },
+    {
+      "category": "Category 2.9 \u2013 Medical Leadership (if relevant)",
+      "prompt": "What clinical or trial experience does the medical leadership bring? For FDA-regulated startups, depth here is critical. Does the company have an FDA expert on the team, contracted with a company or have board skills in this category?"
+    },
+    {
+      "category": "Category 2.10 \u2013 Leadership Red Flags",
+      "prompt": "Are there observable leadership risks such as skill gaps, turnover trends, or cultural misalignment?"
+    }
+  ],
+  "Prompt Domain 3: Product / Market Fit": [
+    {
+      "category": "Category 3.1 \u2013 Problem Definition",
+      "prompt": "What core customer pain points or unmet needs is the startup trying to address? Consider urgency, scale, and clarity of the problem."
+    },
+    {
+      "category": "Category 3.2 \u2013 Proposed Solution",
+      "prompt": "What is the company\u2019s product or service, and how does it solve the identified problem? Is the solution compelling, feasible, and differentiated? Can the team sustain that differentiation long term?"
+    },
+    {
+      "category": "Category 3.3 \u2013 Market Size (TAM/SAM/SOM)",
+      "prompt": "What is the size of the addressable and serviceable market, and what share is realistically attainable? Use credible sources and segmentation logic."
+    },
+    {
+      "category": "Category 3.4 \u2013 Target Customers (ICP)",
+      "prompt": "Who are the ideal customers, and how are they segmented, prioritized, or reached? Look for clarity in the ICP definition and targeting mechanisms."
+    },
+    {
+      "category": "Category 3.5 \u2013 Market Positioning",
+      "prompt": "What is the startup\u2019s value proposition, and how is it positioned compared to competitors? Check if it resonates with buyer psychology."
+    },
+    {
+      "category": "Category 3.6 \u2013 Competitive Advantage",
+      "prompt": "What moats or unique features give this solution a durable edge? These could be UX, data assets, patents, or distribution power."
+    },
+    {
+      "category": "Category 3.7 \u2013 Product Roadmap",
+      "prompt": "What are the following development milestones? Track progress, dependencies, and scalability phases. Do the revenue streams on their pro forma correlate with the roadmap?"
+    },
+    {
+      "category": "Category 3.8 \u2013 Market Extensibility",
+      "prompt": "Can the product scale into adjacent markets or geographies? Assess applicability using the Ansoff Matrix."
+    },
+    {
+      "category": "Category 3.9 \u2013 Fit Risks or Caveats",
+      "prompt": "What risks exist regarding adoption, saturation, or misalignment with buyer needs? These could include a pricing model mismatch, weak onboarding, or timing issues."
+    }
+  ],
+  "Prompt Domain 4: Competition": [
+    {
+      "category": "Category 4.1 \u2013 Competitor Landscape Overview",
+      "prompt": "Who are the startup\u2019s main direct and indirect competitors? Include adjacent solutions competing for budget, attention, or usage."
+    },
+    {
+      "category": "Category 4.2 \u2013 Competitive Positioning & Moat",
+      "prompt": "What is the startup\u2019s unique competitive positioning and sustainable differentiation? Consider data assets, UX, patents, or distribution as moats."
+    },
+    {
+      "category": "Category 4.3 \u2013 Barriers to Entry",
+      "prompt": "How difficult is it for new entrants to compete in this space? Evaluate IP protections, capital intensity, switching costs, and regulatory barriers."
+    },
+    {
+      "category": "Category 4.4 \u2013 SWOT-Based Risk Assessment",
+      "prompt": "What are the startup\u2019s competitive strengths, weaknesses, opportunities, and threats (SWOT)? Include internal and external risk vectors."
+    },
+    {
+      "category": "Category 4.5 \u2013 Competitive Scenario Planning",
+      "prompt": "In what scenarios might the startup gain or lose traction vs. rivals? Simulate outcomes based on pricing, speed, brand equity, or talent."
+    }
+  ],
+  "Prompt Domain 5: Technology / IP / Architecture": [
+    {
+      "category": "Category 5.1 \u2013 Technology Overview",
+      "prompt": "What core technology powers the product, and how mature or innovative is it?"
+    },
+    {
+      "category": "Category 5.2 \u2013 Patent & IP Inventory",
+      "prompt": "What patents or IP protections does the company currently hold or plan to file?"
+    },
+    {
+      "category": "Category 5.3 \u2013 IP Origin",
+      "prompt": "Is the IP internally developed, licensed, or acquired?"
+    },
+    {
+      "category": "Category 5.4 \u2013 IP Strategy",
+      "prompt": "What is the long-term IP strategy, including jurisdictions, renewals, and exclusivity terms?"
+    },
+    {
+      "category": "Category 5.5 \u2013 Tech Stack Review",
+      "prompt": "What technology stack supports the product, and is it scalable and secure?"
+    },
+    {
+      "category": "Category 5.6 \u2013 Strategic Control Points",
+      "prompt": "Which technology parts create strategic leverage (e.g., proprietary models, partners, or supply chains)?"
+    },
+    {
+      "category": "Category 5.7 \u2013 Scalability Architecture",
+      "prompt": "How modular, redundant, and future-proof is the system design?"
+    },
+    {
+      "category": "Category 5.8 \u2013 Sustainable Tech Advantage",
+      "prompt": "What prevents competitors from replicating or leapfrogging the core tech?"
+    },
+    {
+      "category": "Category 5.9 \u2013 Red Flags",
+      "prompt": "Are there concerns about code quality, vendor lock-in, or performance?"
+    }
+  ],
+  "Prompt Domain 6: Traction": [
+    {
+      "category": "Category 6.1 \u2013 Customer Metrics",
+      "prompt": "What are the key metrics around customer usage, such as DAU, MAU, retention, churn, or user growth?"
+    },
+    {
+      "category": "Category 6.2 \u2013 Revenue Traction",
+      "prompt": "What are the current revenue levels and monetization strategies, and how consistent is revenue retention?"
+    },
+    {
+      "category": "Category 6.3 \u2013 User Engagement",
+      "prompt": "How engaged are users with the product?"
+    },
+    {
+      "category": "Category 6.4 \u2013 Sales Pipeline",
+      "prompt": "What is the sales pipeline status regarding leads and conversion?"
+    },
+    {
+      "category": "Category 6.5 \u2013 Pre-Revenue Signals",
+      "prompt": "What alternative traction signals exist (e.g., pilots, grants, LOIs)?"
+    }
+  ],
+  "Prompt Domain 7: Business Model & Financials": [
+    {
+      "category": "Category 7.1 \u2013 Business Architecture & Model",
+      "prompt": "What is the startup\u2019s revenue model and its market fit?"
+    },
+    {
+      "category": "Category 7.2 \u2013 Revenue Strategy & Channels",
+      "prompt": "What are the primary routes to revenue, including sales or integrations?"
+    },
+    {
+      "category": "Category 7.3 \u2013 Financial Forecasts & Assumptions",
+      "prompt": "How realistic are the company\u2019s financial projections?"
+    },
+    {
+      "category": "Category 7.4 \u2013 Unit Economics & Scalability",
+      "prompt": "What are CAC, LTV, gross margin, and how scalable is the model?"
+    },
+    {
+      "category": "Category 7.5 \u2013 Financial Benchmarking",
+      "prompt": "How do the metrics compare with sector benchmarks?"
+    }
+  ],
+  "Prompt Domain 8: Go-To-Market (GTM) Strategy": [
+    {
+      "category": "Category 8.1 \u2013 GTM Strategy Overview",
+      "prompt": "What is the company\u2019s overall GTM strategy and alignment with ICP?"
+    },
+    {
+      "category": "Category 8.2 \u2013 Peer Comparison",
+      "prompt": "How does the GTM strategy compare with peers?"
+    },
+    {
+      "category": "Category 8.3 \u2013 Tactical Execution Plan",
+      "prompt": "What are the detailed GTM plans, KPIs, and milestones?"
+    }
+  ],
+  "Prompt Domain 9: Terms & Exit Strategy": [
+    {
+      "category": "Category 9.1 \u2013 Valuation Benchmark",
+      "prompt": "How does the startup\u2019s valuation compare with peers?"
+    },
+    {
+      "category": "Category 9.2 \u2013 Deal Terms",
+      "prompt": "Are there any investor-unfavorable terms in the deal structure?"
+    },
+    {
+      "category": "Category 9.3 \u2013 Exit Risk & Timing",
+      "prompt": "What risks might prevent a successful exit?"
+    }
+  ],
+  "Prompt Domain 10: FDA Process (If Applicable)": [
+    {
+      "category": "Category 10.1 \u2013 FDA Submission Pathway",
+      "prompt": "What is the startup\u2019s intended regulatory pathway with the FDA?"
+    },
+    {
+      "category": "Category 10.2 \u2013 FDA Process Risk",
+      "prompt": "What risks could delay or derail FDA clearance or approval?"
+    }
+  ],
+  "Prompt Domain 11: Terms & Valuation": [
+    {
+      "category": "Category 11.1 \u2013 Valuation Reasonableness",
+      "prompt": "Is the valuation justified based on traction and market potential?"
+    },
+    {
+      "category": "Category 11.2 \u2013 Convertible Notes / SAFE Review",
+      "prompt": "Does the convertible note contain high-risk clauses?"
+    }
+  ],
+  "Prompt Domain 12: Exit Strategy": [
+    {
+      "category": "Category 12.1 \u2013 Exit Viability & Return Potential",
+      "prompt": "What is the projected return on exit (IRR, MOIC) based on current valuation, ownership, and market conditions?"
+    },
+    {
+      "category": "Category 12.6 \u2013 Final Exit Planning Caveats",
+      "prompt": "Are there unresolved concerns about exit terms, founder incentives, or buyer misfits needing monitoring?"
+    }
+  ]
+};
+
+
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
@@ -11,152 +295,84 @@ export default function Home() {
   const [showReport, setShowReport] = useState(false);
 
   const [mode, setMode] = useState<'upload' | 'questions'>('upload');
-  const questionPrompts = [
-    "Provide a detailed review of the risks and impact of the business including political, technical, regulatory, legal, economic and social risks.",
-    "Provide a summary of other startups in the same space and analyze how this valuation compares with other similarly situated companies.",
-    "What questions should we ask the CEO and their team to avoid blind spots?",
-    "How can the company improve its score?",
-    "What factors should be accounted for to ensure the company’s success? What factors, if ignored, would be problematic and cause the plan to not come true?",
-    "In general, how big a risk is this company from an angel investment perspective?",
-    "Provide a detailed review of the people on the operational team and the advisory board.",
-    "How many exits did the CEO have?",
-    "Has the team worked together in the past?",
-    "Who is on the Board of Directors?",
-    "Are they missing any executive position that would be helpful in their success?",
-    "What is the overall analysis of the team?",
-    "What key hires do they need?",
-    "For medical companies: comment on the KOLs and other evidence that they have the right people involved.",
-    "What is your assessment of the ability of the leadership team executing the business plan?",
-    "Are there any other caveats and concerns regarding leadership?",
+      const questionPrompts = [
+    "Are there unresolved concerns about exit terms, founder incentives, or buyer misfits needing monitoring?"
   ];
 
-  const [answers, setAnswers] = useState<string[]>(Array(questionPrompts.length).fill(''));
+  const [selectedDomain, setSelectedDomain] = useState<string>(Object.keys(categorizedPrompts)[0]);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [submitted, setSubmitted] = useState(false);
+
   const [aiReport, setAiReport] = useState<string>('');
-  const [reportLoading, setReportLoading] = useState(false);
   const [macroRiskAnalysis, setMacroRiskAnalysis] = useState('');
   const [macroRiskLoading, setMacroRiskLoading] = useState(false);
 
+  const [reportData, setReportData] = useState<any>(null);
+  const [reportLoading, setReportLoading] = useState(false);
 
-  const reportData = {
-    summary: {
-      companyName: "PRK’n",
-      website: "www.prk-n.com",
-      ceo: "Blake Spencer",
-      founded: "2024",
-      businessModel: "P2P Parking Marketplace (25% platform fee)",
-      dealStructure: "Not specified in deck",
-      askValuation: "Not disclosed; implied via financials",
-      revenueStreams: "Booking Fees (25% of transaction)"
-    },
-    categories: [
-      {
-        category: "Leadership",
-        description: "Founder-led with technical + creative strategy team",
-        strengths: "Boots-on-ground validation, iterative feedback, operational insight",
-        concerns: "No disclosed track record of exits or relevant industry experience",
-        score: 6,
-        weight: "30%",
-        weightedScore: 1.8,
-      },
-      {
-        category: "Market Size & Fit",
-        description: "Parking near events/beaches/ski/urban is a growing pain point",
-        strengths: "Massive latent market; events-based use cases; local monetization",
-        concerns: "Highly fragmented, regionalized adoption needed",
-        score: 7,
-        weight: "25%",
-        weightedScore: 1.75,
-      },
-      {
-        category: "Technology & IP",
-        description: "Marketplace platform; no proprietary tech or patent mention",
-        strengths: "Simple mobile-first product, real-time availability integration",
-        concerns: "No IP, unclear if defensible against competitors",
-        score: 4,
-        weight: "10%",
-        weightedScore: 0.4,
-      },
-    ],
-    totalWeightedScore: 5.8,
-    competitiveLandscape: [
-      {
-        competitor: "SpotHero",
-        description: "Aggregates parking garages/lots across U.S.",
-        differentiator: "PRK’n focuses on private homeowners near events"
-      },
-      {
-        competitor: "ParkMobile",
-        description: "City/metropolitan lot parking",
-        differentiator: "PRK’n is peer-to-peer and event/venue specific"
-      },
-    ],
-    riskNote: "No patent/IP or defensibility. Easy for competitors to replicate the business model.",
-    recommendations: [
-      {
-        title: "Leadership Score (Currently 6/10)",
-        items: [
-          "Bring on a co-founder or exec with marketplace scaling or mobility background.",
-          "Show investor that CEO can lead to scale (e.g., accelerators, board advisors)."
-        ]
-      },
-      {
-        title: "Technology/IP (Currently 4/10)",
-        items: [
-          "File provisional patent on unique routing, parking monetization algorithms.",
-          "Build barriers via partnerships (exclusive rights with venues, schools, etc.)."
-        ]
-      },
-      {
-        title: "Competition/Moat (Currently 4/10)",
-        items: [
-          "Lock in exclusive supply with local governments or events.",
-          "Focus on customer trust/community features to deter churn to larger platforms."
-        ]
-      },
-      {
-        title: "Traction",
-        items: [
-          "Show month-over-month growth, bookings per market, and LTV/CAC analysis.",
-          "Highlight repeat usage behavior in beta tests."
-        ]
-      },
-      {
-        title: "Exit Strategy",
-        items: [
-          "Identify specific acquisition targets and articulate synergy (Airbnb, Waze, Live Nation)."
-        ]
+  const handleAnswerChange = (category: string, value: string) => {
+  setAnswers(prev => ({ ...prev, [category]: value }));
+  };
+
+  const handleSubmit = () => {
+    setSubmitted(true);
+    console.log('Submitted answers:', answers);
+  };
+
+
+
+
+      const combineQuestionsAndAnswersToText = (
+        domain: string,
+        prompts: { category: string; prompt: string }[],
+        answers: Record<string, string>
+      ): string => {
+        return prompts
+          .filter(({ category }) => answers[category]?.trim()) 
+          .map(({ category, prompt }) => {
+            const answer = answers[category].trim();
+            return `${category}:\n${prompt}\nAnswer:\n${answer}`;
+          })
+          .join('\n\n');
+      };
+
+
+
+    const handleSubmitAnswersForScoring = async () => {
+       const combinedText = combineQuestionsAndAnswersToText(selectedDomain, categorizedPrompts[selectedDomain], answers);
+
+      if (!combinedText.trim()) {
+        alert("Please fill some answers before submitting.");
+        return;
       }
-    ],
-    keyQuestions: {
-      marketStrategy: [
-        "How do you plan to grow supply and demand in new geographies simultaneously?",
-        "What are your key acquisition channels, and how much does it cost to acquire a user?"
-      ],
-      defensibility: [
-        "What are you doing to protect against replication from SpotHero, ParkMobile, etc.?",
-        "Do you have any exclusivity agreements or patents filed?"
-      ],
-      financials: [
-        "Can you provide a pro forma P&L and cash flow forecast for next 2 years?",
-        "What’s the expected CAC vs. average transaction value and LTV?"
-      ],
-      productDevelopment: [
-        "Is PRK’n building routing or AI capabilities that add stickiness?",
-        "How will you handle liability issues if a user damages a homeowner’s property?"
-      ],
-      exitStrategy: [
-        "Who do you see as the most likely acquirer, and when do you think the business will be attractive to them?"
-      ]
-    },
-    conclusion: "PRK’n offers a unique niche focus in a fragmented and underutilized market segment: local private parking near events and destinations. The value proposition is real, and the team has demonstrated on-the-ground iteration and understanding of user pain. However, it faces high competitive and replicability risk, unclear defensibility, and unvalidated scale economics. A weighted score of 5.8/10 places it in the “watch and validate further” category.",
-    recommendation: "Proceed to prescreen with conditions: Provide more data on user growth, unit economics, and scalability strategy. Explore pilot partnerships with events, schools, or towns to lock in first-mover position."
-  };
 
-  const getRiskIcon = (score: number) => {
-    if(score < 4) return <>🚩 Red Flag</>;
-    if(score < 6) return <>⚠️ Yellow Flag</>;
-    return <>✅ Green Flag</>;
-  };
+      setLoading(true);
+      setResult(null);
+
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/score`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: combinedText }),
+        });
+        const data = await res.json();
+
+        console.log("API response data:", data);
+
+
+        if (data.error) {
+          alert(`Error: ${data.error}`);
+        } else {
+          setResult(data);
+        }
+      } catch (error) {
+        alert("Failed to submit answers for scoring.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+
 
   const handleUpload = async () => {
     if (!file) return alert('Please select a PDF file');
@@ -181,93 +397,143 @@ export default function Home() {
     }
   };
 
-  const calculateTotalScore = () => {
-    if (!result?.scores) return null;
-    const scores = Object.values(result.scores)
-      .map((v: any) => (typeof v.Score === 'number' ? v.Score : 0));
-    if (scores.length === 0) return null;
-    const total = scores.reduce((a, b) => a + b, 0);
-    return total.toFixed(1);
+ const calculateTotalScore = () => {
+  if (!result?.scores) return null;
+  const scores = Object.values(result.scores)
+    .map((v) => {
+      const val = v as { Score?: number };
+      return typeof val.Score === 'number' ? val.Score : 0;
+    });
+  if (scores.length === 0) return null;
+  const total = scores.reduce((a, b) => a + b, 0);
+  return total.toFixed(1);
+};
+
+
+
+  const renderScoreRow = (factor: string, value: any) => {
+    if (!value || typeof value !== 'object') return null; 
+    return (
+      <tr key={factor} className="hover:bg-indigo-50 transition">
+        <td className="py-2 px-3 font-medium">{factor}</td>
+        <td
+          className={`py-2 px-3 font-bold ${
+            value.Color === 'Green'
+              ? 'text-green-600'
+              : value.Color === 'Yellow'
+              ? 'text-yellow-600'
+              : value.Color === 'Red'
+              ? 'text-red-600'
+              : 'text-gray-600'
+          }`}
+        >
+          {typeof value.Score === 'number' ? value.Score : 'N/A'}
+        </td>
+        <td className="py-2 px-3">{value.Justification || 'No justification provided'}</td>
+      </tr>
+    );
   };
 
-  const renderScoreRow = (factor: string, value: any) => (
-    <tr key={factor} className="hover:bg-indigo-50 transition">
-      <td className="py-2 px-3 font-medium">{factor}</td>
-      <td
-        className={`py-2 px-3 font-bold ${
-          value.Color === 'Green' ? 'text-green-600' : value.Color === 'Yellow' ? 'text-yellow-600' : 'text-red-600'
-        }`}
-      >
-        {value.Score}
-      </td>
-      <td className="py-2 px-3">{value.Justification}</td>
-    </tr>
+  const renderScoreTable = () => (
+    <div className="w-full max-w-3xl mt-6">
+      <div className="flex justify-between items-center mb-3">
+        <h2 className="text-lg font-semibold text-gray-700">TCA Factor Scoring</h2>
+        <div className="text-indigo-700 font-bold text-xl">Total Score: {calculateTotalScore() ?? '--'}</div>
+      </div>
+      <table className="w-full border rounded-lg bg-white shadow">
+        <thead>
+          <tr className="bg-indigo-100">
+            <th className="py-2 px-3 border-b text-left">Factor</th>
+            <th className="py-2 px-3 border-b text-left">Score</th>
+            <th className="py-2 px-3 border-b text-left">Justification</th>
+          </tr>
+        </thead>
+        <tbody>
+          {result && result.scores && typeof result.scores === 'object' ? (
+            Object.entries(result.scores).map(([factor, value]: any) => {
+              if (!value || typeof value !== 'object') return null;
+              return (
+                <tr key={factor} className="hover:bg-indigo-50 transition">
+                  <td className="py-2 px-3 font-medium">{factor}</td>
+                  <td
+                    className={`py-2 px-3 font-bold ${
+                      value.Color === 'Green'
+                        ? 'text-green-600'
+                        : value.Color === 'Yellow'
+                        ? 'text-yellow-600'
+                        : value.Color === 'Red'
+                        ? 'text-red-600'
+                        : 'text-gray-600'
+                    }`}
+                  >
+                    {typeof value.Score === 'number' ? value.Score : 'N/A'}
+                  </td>
+                  <td className="py-2 px-3">{value.Justification || 'No justification provided'}</td>
+                </tr>
+              );
+            })
+          ) : (
+            <tr>
+              <td colSpan={3} className="text-center py-4 text-gray-500">
+                No scores available yet.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+      {(() => {
+        const total = Number(calculateTotalScore());
+        let risk = '';
+        if (total >= 80) risk = 'Low';
+        else if (total >= 60) risk = 'Medium';
+        else risk = 'High';
+        return (
+          <p className="mt-4 text-center font-semibold text-red-700">
+            Overall Risk Level: <span className="uppercase">{risk}</span>
+          </p>
+        );
+      })()}
+    </div>
   );
 
-  const handleChangeAnswer = (index: number, value: string) => {
-    const newAnswers = [...answers];
-    newAnswers[index] = value;
-    setAnswers(newAnswers);
-  };
 
-  const handleSubmitAnswers = () => {
-    setReportLoading(true);
-    setAiReport('');
-    setTimeout(() => {
-      setAiReport(`
-Here is the Comprehensive Investment Report for PRK’n...
+  const handleGenerateReport = async () => {
+  if (!result?.scores) {
+    alert("Please submit scoring results first.");
+    return;
+  }
 
-🔍 **Quick Summary**
+  setReportLoading(true);
+  try {
+    const projectText = "project description";
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/generate_analysis_report`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        scores: result.scores,
+        project_text: projectText,
+      }),
+    });
 
-| Element          | Details                                       |
-|------------------|-----------------------------------------------|
-| Company Name     | PRK’n                                         |
-| Website          | www.prk-n.com                                 |
-| CEO              | Blake Spencer                                 |
-| Founded          | 2024                                          |
-| Business Model   | P2P Parking Marketplace (25% platform fee)    |
-| Deal Structure   | Not specified in deck                         |
-| Ask / Valuation  | Not disclosed; implied via financials         |
-| Revenue Streams  | Booking Fees (25% of transaction)             |
+    const data = await res.json();
+    if (data.error) {
+      alert(`Error: ${data.error}`);
+    } else {
+      setReportData(data);  
+      setShowReport(true);
+    }
+  } catch (error) {
+    alert("Failed to generate AI analysis report.");
+  } finally {
+    setReportLoading(false);
+  }
+};
 
-📊 **Category Evaluation Table (with Weighting)**
 
-| Category                  | Description                                  | Strengths                           | Concerns                               | Score | Weight | Weighted Score | Risk Level |
-|---------------------------|----------------------------------------------|-------------------------------------|----------------------------------------|-------|--------|----------------|------------|
-| Leadership                | Founder-led with technical + creative team   | Operational insight                 | No industry exits experience           | 6     | 30%    | 1.8            | 🟡 Medium  |
-| Market Size & Fit         | Parking near events/beaches/ski/urban        | Massive latent market               | Regionalized adoption needed           | 7     | 25%    | 1.75           | 🟢 Low |
-| Technology & IP           | Marketplace, no proprietary tech             | Simple mobile-first product         | No IP protection                       | 4     | 10%    | 0.4            | 🔴 High  |
+useEffect(() => {
+  console.log("reportData updated:", reportData);
+}, [reportData]);
 
-🎯 **Total Weighted Score: 5.8 / 10**
-
-🔴 **Risk:** No patent/IP or defensibility.
-
-🛠 **Recommendations to Improve Score**
-
-- **Leadership (6/10)**: Bring on exec with marketplace experience.
-- **Technology/IP (4/10)**: File provisional patent.
-
-❓ **Key Questions for the CEO**
-
-- **Market Strategy**: How do you plan to grow supply and demand?
-
-📘 **Conclusion**
-
-PRK’n offers niche focus with high potential but needs validation.
-
-🔦 **Recommendation**:
-Proceed with conditions: Provide more data on growth and economics.
-
----
-
-After 10 runs of the evaluation, the General Consistency result is:
-
-✅ Green Flag — Balanced scores observed with a standard deviation of 1.3.  
-This indicates stable and reliable evaluation across all domains.
-      `);
-      setReportLoading(false);
-    }, 800);
-  };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-10 gap-4 font-sans bg-gradient-to-br from-gray-50 to-indigo-100">
@@ -278,7 +544,6 @@ This indicates stable and reliable evaluation across all domains.
           onClick={() => {
             setMode('upload');
             setAiReport('');
-            setAnswers(Array(questionPrompts.length).fill(''));
             setResult(null);
           }}
           className={`px-4 py-2 rounded ${mode === 'upload' ? 'bg-indigo-600 text-white' : 'bg-gray-200'}`}
@@ -334,36 +599,7 @@ This indicates stable and reliable evaluation across all domains.
             </div>
           )}
 
-          {result && !result.error && (
-            <div className="w-full max-w-3xl mt-6">
-              <div className="flex justify-between items-center mb-3">
-                <h2 className="text-lg font-semibold text-gray-700">TCA Factor Scoring</h2>
-                <div className="text-indigo-700 font-bold text-xl">Total Score: {calculateTotalScore() ?? '--'}</div>
-              </div>
-              <table className="w-full border rounded-lg bg-white shadow">
-                <thead>
-                  <tr className="bg-indigo-100">
-                    <th className="py-2 px-3 border-b text-left">Factor</th>
-                    <th className="py-2 px-3 border-b text-left">Score</th>
-                    <th className="py-2 px-3 border-b text-left">Justification</th>
-                  </tr>
-                </thead>
-                <tbody>{Object.entries(result.scores).map(([factor, value]: any) => renderScoreRow(factor, value))}</tbody>
-              </table>
-              {(() => {
-                const total = Number(calculateTotalScore());
-                let risk = '';
-                if (total >= 80) risk = 'Low';
-                else if (total >= 60) risk = 'Medium';
-                else risk = 'High';
-                return (
-                  <p className="mt-4 text-center font-semibold text-red-700">
-                    Overall Risk Level: <span className="uppercase">{risk}</span>
-                  </p>
-                );
-              })()}
-            </div>
-          )}
+         {result && !result.error && renderScoreTable()}
 
           {result && result.error && <div className="mt-6 text-red-600 font-semibold">Error: {result.error}</div>} 
 
@@ -373,7 +609,6 @@ This indicates stable and reliable evaluation across all domains.
                 <button
                   className="bg-orange-500 text-white px-4 py-2 rounded shadow hover:bg-orange-600"
                   onClick={async () => {
-                    // 显示loading
                     setMacroRiskLoading(true);
                     setMacroRiskAnalysis('');
                     try {
@@ -409,38 +644,83 @@ This indicates stable and reliable evaluation across all domains.
         </>
       )}
 
-      {mode === 'questions' && (
-        <>
-          <div className="max-h-[600px] overflow-auto bg-white rounded-lg p-6 shadow space-y-6 max-w-3xl w-full">
-            {questionPrompts.map((q, i) => (
-              <div key={i} className="flex flex-col">
-                <label className="font-semibold mb-1">{q}</label>
+      {mode === 'questions' && !result && (
+  <div className="min-h-screen flex flex-row bg-gray-50 p-6">
+    <aside className="w-1/4 pr-4 border-r border-gray-300">
+      <h2 className="text-lg font-bold mb-4">Prompt Domains</h2>
+      <ul className="space-y-2">
+        {Object.keys(categorizedPrompts).map(domain => (
+          <li key={domain}>
+            <button
+              className={`text-left w-full px-3 py-2 rounded ${
+                domain === selectedDomain ? 'bg-indigo-600 text-white' : 'hover:bg-gray-200'
+              }`}
+              onClick={() => setSelectedDomain(domain)}
+            >
+              {domain}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </aside>
+
+    <main className="flex-1 pl-6">
+            <h2 className="text-xl font-bold mb-6 text-indigo-700">{selectedDomain}</h2>
+            <form
+            onSubmit={e => {
+              e.preventDefault();
+              handleSubmit();
+            }}
+            className="space-y-6"
+          >
+            {categorizedPrompts[selectedDomain].map(({ category, prompt }) => (
+              <div key={category}>
+                <label className="block font-semibold mb-1">{category}</label>
+                <p className="text-sm text-gray-700 mb-2">{prompt}</p>
                 <textarea
+                  className="w-full border p-2 rounded resize-none focus:outline-indigo-500"
                   rows={3}
-                  className="border rounded p-2 resize-none focus:outline-indigo-500"
-                  value={answers[i]}
-                  onChange={e => handleChangeAnswer(i, e.target.value)}
-                  placeholder="Type your answer here..."
+                  value={answers[category] || ''}
+                  onChange={e => handleAnswerChange(category, e.target.value)}
                 />
               </div>
             ))}
-          </div>
 
-          <button
-            onClick={handleSubmitAnswers}
-            disabled={reportLoading}
-            className="bg-indigo-700 text-white px-8 py-3 rounded-lg font-semibold hover:bg-indigo-800 disabled:opacity-50 transition mt-4"
-          >
-            {reportLoading ? 'Submitting...' : 'Submit Answers'}
-          </button>
+            {/* ✅ Submit button placed OUTSIDE the map loop */}
+            <button
+              type="button"
+              onClick={handleSubmitAnswersForScoring}
+              className="bg-indigo-600 text-white px-6 py-3 rounded hover:bg-indigo-700"
+            >
+              Submit All Answers
+            </button>
 
-          {aiReport && (
-            <div className="max-w-3xl w-full bg-white p-6 rounded shadow mt-6 prose prose-indigo">
-              <ReactMarkdown>{aiReport}</ReactMarkdown>
-            </div>
-          )}
-        </>
+            <button
+              onClick={() => {
+                setAnswers({});
+                setResult(null);
+              }}
+              className="mt-4 bg-red-500 text-white px-4 py-2 rounded"
+            >
+              Clear Answers
+            </button>
+
+          </form>
+
+          
+
+          </main>
+        </div>
       )}
+
+
+     {mode === 'questions' && result && (
+        <div>
+          <p>Questions mode content here...</p>
+          {result && !result.error && renderScoreTable()}
+        </div>
+      )}
+
 
       <div className="flex gap-4 mt-4">
         <button
@@ -459,25 +739,26 @@ This indicates stable and reliable evaluation across all domains.
 
       <div className="p-6 bg-gray-50 min-h-screen flex flex-col items-center">
         <button
-          onClick={() => setShowReport(true)}
+          onClick={handleGenerateReport}
           className="bg-orange-600 text-white px-6 py-3 rounded-lg text-lg mb-8 shadow hover:bg-orange-700"
+          disabled={reportLoading}
         >
-          Generate AI Analysis Report
+          {reportLoading ? "Generating Report..." : "Generate AI Analysis Report"}
         </button>
 
-        {showReport && (
+        {showReport && reportData && (
           <div className="w-full max-w-4xl space-y-8">
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <h2 className="text-xl font-bold mb-4">🔍 Quick Summary</h2>
               <div className="grid grid-cols-2 gap-4">
-                <div><span className="font-semibold">Company Name:</span> {reportData.summary.companyName}</div>
-                <div><span className="font-semibold">Website:</span> {reportData.summary.website}</div>
-                <div><span className="font-semibold">CEO:</span> {reportData.summary.ceo}</div>
+                <div><span className="font-semibold">Company Name:</span> {reportData?.summary?.companyName}</div>
+                <div><span className="font-semibold">Website:</span> {reportData?.summary?.website}</div>
+                <div><span className="font-semibold">CEO:</span> {reportData.summary?.ceo}</div>
                 <div><span className="font-semibold">Founded:</span> {reportData.summary.founded}</div>
-                <div><span className="font-semibold">Business Model:</span> {reportData.summary.businessModel}</div>
-                <div><span className="font-semibold">Deal Structure:</span> {reportData.summary.dealStructure}</div>
-                <div><span className="font-semibold">Ask / Valuation:</span> {reportData.summary.askValuation}</div>
-                <div><span className="font-semibold">Revenue Streams:</span> {reportData.summary.revenueStreams}</div>
+                <div><span className="font-semibold">Business Model:</span> {reportData.summary?.businessModel}</div>
+                <div><span className="font-semibold">Deal Structure:</span> {reportData.summary?.dealStructure}</div>
+                <div><span className="font-semibold">Ask / Valuation:</span> {reportData.summary?.askValuation}</div>
+                <div><span className="font-semibold">Revenue Streams:</span> {reportData.summary?.revenueStreams}</div>
               </div>
             </div>
 
@@ -551,7 +832,7 @@ This indicates stable and reliable evaluation across all domains.
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <h2 className="text-lg font-bold mb-2">🛠 Recommendations to Improve Score</h2>
               <div className="space-y-4">
-                {reportData.recommendations.map((group, idx) => (
+                {reportData?.recommendations?.map((group, idx) => (
                   <div key={idx}>
                     <div className="font-semibold text-indigo-700 mb-1">{group.title}</div>
                     <ul className="list-disc pl-6 space-y-1">
@@ -567,7 +848,7 @@ This indicates stable and reliable evaluation across all domains.
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <h2 className="text-lg font-bold mb-2">❓ Key Questions for the CEO</h2>
               <div className="space-y-2">
-                {Object.entries(reportData.keyQuestions).map(([section, qs]) => (
+                {Object.entries(reportData?.keyQuestions).map(([section, qs]) => (
                   <div key={section}>
                     <span className="font-semibold capitalize">{section.replace(/([A-Z])/g, " $1")}: </span>
                     <ul className="list-disc pl-6">
@@ -580,8 +861,8 @@ This indicates stable and reliable evaluation across all domains.
 
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <h2 className="text-lg font-bold mb-2">📘 Conclusion</h2>
-              <div className="mb-2">{reportData.conclusion}</div>
-              <div className="font-bold text-indigo-700">{reportData.recommendation}</div>
+              <div className="mb-2">{reportData?.conclusion}</div>
+              <div className="font-bold text-indigo-700">{reportData?.recommendation}</div>
             </div>
 
             <div className="bg-white rounded-2xl shadow-lg p-6">
