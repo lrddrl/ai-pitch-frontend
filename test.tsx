@@ -15,53 +15,6 @@ interface ScoreItem {
 }
 
 
-// 收集每个评分历史的平均分
-function getAvgScoresPerRun(historyArr) {
-  return historyArr.map(scoresObj => {
-    const values = Object.values(scoresObj).map(v =>
-      typeof v.Score === 'number' ? v.Score : 0
-    );
-    return values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
-  });
-}
-
-// 统计低分domain数量
-function countLowDomains(scoresObj, threshold = 5) {
-  return Object.values(scoresObj).filter(v => typeof v.Score === 'number' && v.Score < threshold).length;
-}
-
-// 计算评分历史的标准差
-function std(arr) {
-  if (!arr.length) return 0;
-  const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
-  const sqDiff = arr.map(v => Math.pow(v - mean, 2));
-  return Math.sqrt(sqDiff.reduce((a, b) => a + b, 0) / arr.length);
-}
-
-// 生成一致性标志
-function getConsistencyFlag(historyArr) {
-  if (historyArr.length === 0) return { flag: 'N/A', reason: 'No scores yet' };
-  const avgs = getAvgScoresPerRun(historyArr);
-  const deviation = std(avgs);
-
-  // 统计2+ domain低于5的历史评分数量
-  const domainLowCounts = historyArr.map(obj => countLowDomains(obj, 5));
-  const has2OrMoreLow = domainLowCounts.some(count => count >= 2);
-
-  if (deviation > 2.5 || has2OrMoreLow) {
-    return { flag: "🚩 Red Flag", reason: "Score std. deviation > 2.5 OR 2+ domains < 5" };
-  }
-  if (deviation > 1.5 || domainLowCounts.some(count => count >= 1)) {
-    return { flag: "⚠️ Yellow Flag", reason: "Std. dev > 1.5 OR 1 domain < 5" };
-  }
-  if (deviation < 1.5 && avgs.every(avg => avg >= 8)) {
-    return { flag: "✅ Green Flag", reason: "Balanced scores, std dev < 1.5 and all scores >8" };
-  }
-  return { flag: "✅ Green Flag", reason: "Balanced scores, std dev < 1.5" };
-}
-
-
-
 const categorizedPrompts: Record<string, { category: string; prompt: string }[]> = {
   "Prompt Domain 1: Risk / Impact Analysis": [
     {
@@ -342,8 +295,6 @@ export default function Home() {
   const [showFullText, setShowFullText] = useState(false);
   const [showReport, setShowReport] = useState(false);
 
-  const [scoreHistory, setScoreHistory] = useState<any[]>([]);
-
   const [mode, setMode] = useState<'upload' | 'questions'>('upload');
       const questionPrompts = [
     "Are there unresolved concerns about exit terms, founder incentives, or buyer misfits needing monitoring?"
@@ -590,7 +541,6 @@ const getFlagAndReason = (
 
         console.log("API response data:", data);
 
-        if (data?.scores) setScoreHistory(prev => [...prev, data.scores]);
 
         if (data.error) {
           alert(`Error: ${data.error}`);
@@ -639,8 +589,6 @@ const getFlagAndReason = (
       });
       const data = await res.json();
       setResult(data);
-
-      if (data.scores) setScoreHistory(prev => [...prev, data.scores]);
     } catch (err) {
       alert('Failed to upload files');
     } finally {
