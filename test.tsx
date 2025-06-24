@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect,useRef} from 'react';
+import { useState, useEffect } from 'react';
 import ReactMarkdown from "react-markdown";
-import PdfFileList from './PdfFileList'; 
 
 
 interface ScoreItem {
@@ -14,281 +13,46 @@ interface ScoreItem {
   justification?: string;
 }
 
+interface ScoreObj {
+  [key: string]: {
+    Score?: number | null;
+    Color?: string;
+    Justification?: string;
+    [key: string]: any; 
+  }
+}
 
-const categorizedPrompts: Record<string, { category: string; prompt: string }[]> = {
-  "Prompt Domain 1: Risk / Impact Analysis": [
-    {
-      "category": "Category 1.1 \u2013 Macro-Level Risk",
-      "prompt": "What macro-level risks could impact this startup, including political, technical, social or societal, environmental, legal, or ESG factors? Consider regulatory instability, shifting tech standards, or ESG liabilities that influence long-term sustainability."
-    },
-    {
-      "category": "Category 1.2 \u2013 Sector Valuation Comparison",
-      "prompt": "How does the startup's valuation compare to peers in the same industry and stage? Use comparable market comps, stage benchmarks, and growth-adjusted multiples to contextualize valuation. Focus on both revenue and EBITDA multiples where it makes sense."
-    },
-    {
-      "category": "Category 1.3 \u2013 Blind Spot Assessment",
-      "prompt": "What questions should be asked to uncover blind spots or risks not visible in current disclosures? Probe potential biases in traction data, overlooked market dynamics, or leadership gaps. What other companies could potentially use its resources to build an adjacency to its current business and compete?"
-    },
-    {
-      "category": "Category 1.4 \u2013 Score Optimization",
-      "prompt": "Which specific areas should the startup focus on to improve its overall evaluation score? Evaluate leadership depth, traction strength, product defensibility, product platform expansion to adjacent markets, or GTM clarity."
-    },
-    {
-      "category": "Category 1.5 \u2013 Success vs. Failure Predictors",
-      "prompt": "What leading indicators suggest this company is more likely to succeed or fail? Use predictive patterns across funding history, founder experience, market timing,strength of patent if it can be determined, and early traction. If it is a new to the world product, does the team have the wherewithal to succeed in building a brand?"
-    },
-    {
-      "category": "Category 1.6 \u2013 Angel Investor Risk",
-      "prompt": "What risks do angel investors introduce (e.g., governance misalignment, unrealistic exit pressure)? Review early investor rights, influence on cap table dynamics, or risk of over-mentorship."
-    }
-  ],
-  "Prompt Domain 2: Leadership & Team": [
-    {
-      "category": "Category 2.1 \u2013 Team Composition",
-      "prompt": "What is the overall composition of the leadership team, and how balanced are roles and responsibilities? Look for the team to have complementary skills and backgrounds in technical, commercial, and operational experience."
-    },
-    {
-      "category": "Category 2.2 \u2013 Board & Advisors",
-      "prompt": "Who sits on the board or advisory committee, and what strategic value do they add? Highlight domain expertise, network access, or track records in scaling startups."
-    },
-    {
-      "category": "Category 2.3 \u2013 KOL/Expert Involvement",
-      "prompt": "Can credible KOLs or domain experts support the company\u2019s development strategy? Especially critical for medtech or biotech evaluations."
-    },
-    {
-      "category": "Category 2.4 \u2013 Execution Alignment",
-      "prompt": "How well is the leadership team aligned with execution milestones and KPIs? Cross-check OKRs, prior project delivery timelines, and founder-operational focus."
-    },
-    {
-      "category": "Category 2.5 \u2013 Critical Hires",
-      "prompt": "Which key roles are unfilled, and how might that affect the company's go-to-market or scale-up ability?"
-    },
-    {
-      "category": "Category 2.6 \u2013 CEO Track Record",
-      "prompt": "Has the CEO, founding, or key members of the operational team successfully exited companies? Prior exit experience often correlates with better strategic foresight."
-    },
-    {
-      "category": "Category 2.7 \u2013 Team Cohesion",
-      "prompt": "Has this team worked together before? What is the level of collaboration and trust? Look for early signals from investor calls, founder narratives, or organizational transparency."
-    },
-    {
-      "category": "Category 2.8 \u2013 Board Dynamics",
-      "prompt": "What governance structures and voting rights exist at the board level? Identify any control risks or founder-board tension signals. Do the board members offer skills to support the company\u2019s goals?"
-    },
-    {
-      "category": "Category 2.9 \u2013 Medical Leadership (if relevant)",
-      "prompt": "What clinical or trial experience does the medical leadership bring? For FDA-regulated startups, depth here is critical. Does the company have an FDA expert on the team, contracted with a company or have board skills in this category?"
-    },
-    {
-      "category": "Category 2.10 \u2013 Leadership Red Flags",
-      "prompt": "Are there observable leadership risks such as skill gaps, turnover trends, or cultural misalignment?"
-    }
-  ],
-  "Prompt Domain 3: Product / Market Fit": [
-    {
-      "category": "Category 3.1 \u2013 Problem Definition",
-      "prompt": "What core customer pain points or unmet needs is the startup trying to address? Consider urgency, scale, and clarity of the problem."
-    },
-    {
-      "category": "Category 3.2 \u2013 Proposed Solution",
-      "prompt": "What is the company\u2019s product or service, and how does it solve the identified problem? Is the solution compelling, feasible, and differentiated? Can the team sustain that differentiation long term?"
-    },
-    {
-      "category": "Category 3.3 \u2013 Market Size (TAM/SAM/SOM)",
-      "prompt": "What is the size of the addressable and serviceable market, and what share is realistically attainable? Use credible sources and segmentation logic."
-    },
-    {
-      "category": "Category 3.4 \u2013 Target Customers (ICP)",
-      "prompt": "Who are the ideal customers, and how are they segmented, prioritized, or reached? Look for clarity in the ICP definition and targeting mechanisms."
-    },
-    {
-      "category": "Category 3.5 \u2013 Market Positioning",
-      "prompt": "What is the startup\u2019s value proposition, and how is it positioned compared to competitors? Check if it resonates with buyer psychology."
-    },
-    {
-      "category": "Category 3.6 \u2013 Competitive Advantage",
-      "prompt": "What moats or unique features give this solution a durable edge? These could be UX, data assets, patents, or distribution power."
-    },
-    {
-      "category": "Category 3.7 \u2013 Product Roadmap",
-      "prompt": "What are the following development milestones? Track progress, dependencies, and scalability phases. Do the revenue streams on their pro forma correlate with the roadmap?"
-    },
-    {
-      "category": "Category 3.8 \u2013 Market Extensibility",
-      "prompt": "Can the product scale into adjacent markets or geographies? Assess applicability using the Ansoff Matrix."
-    },
-    {
-      "category": "Category 3.9 \u2013 Fit Risks or Caveats",
-      "prompt": "What risks exist regarding adoption, saturation, or misalignment with buyer needs? These could include a pricing model mismatch, weak onboarding, or timing issues."
-    }
-  ],
-  "Prompt Domain 4: Competition": [
-    {
-      "category": "Category 4.1 \u2013 Competitor Landscape Overview",
-      "prompt": "Who are the startup\u2019s main direct and indirect competitors? Include adjacent solutions competing for budget, attention, or usage."
-    },
-    {
-      "category": "Category 4.2 \u2013 Competitive Positioning & Moat",
-      "prompt": "What is the startup\u2019s unique competitive positioning and sustainable differentiation? Consider data assets, UX, patents, or distribution as moats."
-    },
-    {
-      "category": "Category 4.3 \u2013 Barriers to Entry",
-      "prompt": "How difficult is it for new entrants to compete in this space? Evaluate IP protections, capital intensity, switching costs, and regulatory barriers."
-    },
-    {
-      "category": "Category 4.4 \u2013 SWOT-Based Risk Assessment",
-      "prompt": "What are the startup\u2019s competitive strengths, weaknesses, opportunities, and threats (SWOT)? Include internal and external risk vectors."
-    },
-    {
-      "category": "Category 4.5 \u2013 Competitive Scenario Planning",
-      "prompt": "In what scenarios might the startup gain or lose traction vs. rivals? Simulate outcomes based on pricing, speed, brand equity, or talent."
-    }
-  ],
-  "Prompt Domain 5: Technology / IP / Architecture": [
-    {
-      "category": "Category 5.1 \u2013 Technology Overview",
-      "prompt": "What core technology powers the product, and how mature or innovative is it?"
-    },
-    {
-      "category": "Category 5.2 \u2013 Patent & IP Inventory",
-      "prompt": "What patents or IP protections does the company currently hold or plan to file?"
-    },
-    {
-      "category": "Category 5.3 \u2013 IP Origin",
-      "prompt": "Is the IP internally developed, licensed, or acquired?"
-    },
-    {
-      "category": "Category 5.4 \u2013 IP Strategy",
-      "prompt": "What is the long-term IP strategy, including jurisdictions, renewals, and exclusivity terms?"
-    },
-    {
-      "category": "Category 5.5 \u2013 Tech Stack Review",
-      "prompt": "What technology stack supports the product, and is it scalable and secure?"
-    },
-    {
-      "category": "Category 5.6 \u2013 Strategic Control Points",
-      "prompt": "Which technology parts create strategic leverage (e.g., proprietary models, partners, or supply chains)?"
-    },
-    {
-      "category": "Category 5.7 \u2013 Scalability Architecture",
-      "prompt": "How modular, redundant, and future-proof is the system design?"
-    },
-    {
-      "category": "Category 5.8 \u2013 Sustainable Tech Advantage",
-      "prompt": "What prevents competitors from replicating or leapfrogging the core tech?"
-    },
-    {
-      "category": "Category 5.9 \u2013 Red Flags",
-      "prompt": "Are there concerns about code quality, vendor lock-in, or performance?"
-    }
-  ],
-  "Prompt Domain 6: Traction": [
-    {
-      "category": "Category 6.1 \u2013 Customer Metrics",
-      "prompt": "What are the key metrics around customer usage, such as DAU, MAU, retention, churn, or user growth?"
-    },
-    {
-      "category": "Category 6.2 \u2013 Revenue Traction",
-      "prompt": "What are the current revenue levels and monetization strategies, and how consistent is revenue retention?"
-    },
-    {
-      "category": "Category 6.3 \u2013 User Engagement",
-      "prompt": "How engaged are users with the product?"
-    },
-    {
-      "category": "Category 6.4 \u2013 Sales Pipeline",
-      "prompt": "What is the sales pipeline status regarding leads and conversion?"
-    },
-    {
-      "category": "Category 6.5 \u2013 Pre-Revenue Signals",
-      "prompt": "What alternative traction signals exist (e.g., pilots, grants, LOIs)?"
-    }
-  ],
-  "Prompt Domain 7: Business Model & Financials": [
-    {
-      "category": "Category 7.1 \u2013 Business Architecture & Model",
-      "prompt": "What is the startup\u2019s revenue model and its market fit?"
-    },
-    {
-      "category": "Category 7.2 \u2013 Revenue Strategy & Channels",
-      "prompt": "What are the primary routes to revenue, including sales or integrations?"
-    },
-    {
-      "category": "Category 7.3 \u2013 Financial Forecasts & Assumptions",
-      "prompt": "How realistic are the company\u2019s financial projections?"
-    },
-    {
-      "category": "Category 7.4 \u2013 Unit Economics & Scalability",
-      "prompt": "What are CAC, LTV, gross margin, and how scalable is the model?"
-    },
-    {
-      "category": "Category 7.5 \u2013 Financial Benchmarking",
-      "prompt": "How do the metrics compare with sector benchmarks?"
-    }
-  ],
-  "Prompt Domain 8: Go-To-Market (GTM) Strategy": [
-    {
-      "category": "Category 8.1 \u2013 GTM Strategy Overview",
-      "prompt": "What is the company\u2019s overall GTM strategy and alignment with ICP?"
-    },
-    {
-      "category": "Category 8.2 \u2013 Peer Comparison",
-      "prompt": "How does the GTM strategy compare with peers?"
-    },
-    {
-      "category": "Category 8.3 \u2013 Tactical Execution Plan",
-      "prompt": "What are the detailed GTM plans, KPIs, and milestones?"
-    }
-  ],
-  "Prompt Domain 9: Terms & Exit Strategy": [
-    {
-      "category": "Category 9.1 \u2013 Valuation Benchmark",
-      "prompt": "How does the startup\u2019s valuation compare with peers?"
-    },
-    {
-      "category": "Category 9.2 \u2013 Deal Terms",
-      "prompt": "Are there any investor-unfavorable terms in the deal structure?"
-    },
-    {
-      "category": "Category 9.3 \u2013 Exit Risk & Timing",
-      "prompt": "What risks might prevent a successful exit?"
-    }
-  ],
-  "Prompt Domain 10: FDA Process (If Applicable)": [
-    {
-      "category": "Category 10.1 \u2013 FDA Submission Pathway",
-      "prompt": "What is the startup\u2019s intended regulatory pathway with the FDA?"
-    },
-    {
-      "category": "Category 10.2 \u2013 FDA Process Risk",
-      "prompt": "What risks could delay or derail FDA clearance or approval?"
-    }
-  ],
-  "Prompt Domain 11: Terms & Valuation": [
-    {
-      "category": "Category 11.1 \u2013 Valuation Reasonableness",
-      "prompt": "Is the valuation justified based on traction and market potential?"
-    },
-    {
-      "category": "Category 11.2 \u2013 Convertible Notes / SAFE Review",
-      "prompt": "Does the convertible note contain high-risk clauses?"
-    }
-  ],
-  "Prompt Domain 12: Exit Strategy": [
-    {
-      "category": "Category 12.1 \u2013 Exit Viability & Return Potential",
-      "prompt": "What is the projected return on exit (IRR, MOIC) based on current valuation, ownership, and market conditions?"
-    },
-    {
-      "category": "Category 12.6 \u2013 Final Exit Planning Caveats",
-      "prompt": "Are there unresolved concerns about exit terms, founder incentives, or buyer misfits needing monitoring?"
-    }
-  ]
-};
+
+
+function getAvgScoresPerRun(historyArr: ScoreObj[]): number[] {
+  return historyArr.map((scoresObj) => {
+    const values = Object.values(scoresObj)
+      .map((v) => typeof v.Score === 'number' ? v.Score : 0);
+    return values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+  });
+}
+
+
+function countLowDomains(scoresObj: ScoreObj, threshold = 5): number {
+  return Object.values(scoresObj)
+    .filter((v) => typeof v.Score === 'number' && v.Score < threshold)
+    .length;
+}
+
+
+function std(arr: number[]): number {
+  if (!arr.length) return 0;
+  const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+  const sqDiff = arr.map(v => Math.pow(v - mean, 2));
+  return Math.sqrt(sqDiff.reduce((a, b) => a + b, 0) / arr.length);
+}
+
+
 
 
 
 export default function Home() {
+  const [scoreRuns, setScoreRuns] = useState<number[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -310,6 +74,27 @@ export default function Home() {
 
   const [reportData, setReportData] = useState<any>(null);
   const [reportLoading, setReportLoading] = useState(false);
+
+  const [scoreHistory, setScoreHistory] = useState<ScoreObj[]>([]);
+
+
+const renderConsistencyCard = () => (
+  <div className="bg-white rounded-2xl shadow-lg p-6 mt-6">
+    <h2 className="text-lg font-bold mb-2">📊 General Consistency</h2>
+    <div className="mb-1 text-xl font-semibold">{consistencyFlag.flag}</div>
+    <div className="text-gray-700">{consistencyFlag.reason}</div>
+    {scoreHistory.length > 0 && (
+      <div className="mt-2 text-sm text-gray-600">
+        <div>Number of scoring runs: {scoreHistory.length}</div>
+        <div>
+          Latest scores: {getAvgScoresPerRun(scoreHistory).map(s => s.toFixed(1)).join(', ')}
+        </div>
+        <div>Std. Deviation: {std(getAvgScoresPerRun(scoreHistory)).toFixed(2)}</div>
+      </div>
+    )}
+  </div>
+);
+
 
   const handleAnswerChange = (category: string, value: string) => {
   setAnswers(prev => ({ ...prev, [category]: value }));
@@ -333,175 +118,6 @@ type FlagResult = {
   flag: string;
   reason: string;
 };
-
-const getFlagAndReason = (
-  category: string,
-  score?: number | null,
-  value?: CategoryReport
-): FlagResult => {
-  const c = category.toLowerCase();
-  const justification =
-    value?.concerns || value?.description || value?.strengths || "";
-
-  // Leadership
-  if (/leadership|team/.test(c)) {
-    if (
-      (score ?? 0) < 4 ||
-      /solo founder|no relevant background|missing major executives/i.test(justification)
-    ) {
-      return { flag: "🚩 Red", reason: "Score < 4 or major leadership risk" };
-    } else if (
-      (score ?? 0) < 7 ||
-      /unclear founder|unclear operational roles/i.test(justification)
-    ) {
-      return { flag: "⚠️ Yellow", reason: "Score < 7 or unclear roles" };
-    } else if ((score ?? 0) >= 8) {
-      return { flag: "✅ Green", reason: "Score ≥ 8 with strong team" };
-    }
-  }
-  // Product / IP
-  if (/product|ip/.test(c)) {
-    if (
-      (score ?? 0) < 4 ||
-      /no ip|no innovation|no logic/i.test(justification)
-    ) {
-      return { flag: "🚩 Red", reason: "Score < 4 or no IP/innovation" };
-    } else if (
-      (score ?? 0) < 7 ||
-      /claim.*without validation/i.test(justification)
-    ) {
-      return { flag: "⚠️ Yellow", reason: "Score < 7 or unvalidated claims" };
-    } else if ((score ?? 0) >= 8) {
-      return { flag: "✅ Green", reason: "Clear sustainable advantage/IP" };
-    }
-  }
-  // Traction
-  if (/traction|revenue|user|sales/.test(c)) {
-    if (
-      (score ?? 0) < 4 ||
-      /no user activity|arr ?< ?\$?1k/i.test(justification)
-    ) {
-      return { flag: "🚩 Red", reason: "Score < 4 or no traction" };
-    } else if (
-      (score ?? 0) < 7 ||
-      /no testimonials|pre-revenue/i.test(justification)
-    ) {
-      return { flag: "⚠️ Yellow", reason: "Score < 7 or early stage" };
-    } else if ((score ?? 0) >= 8) {
-      return { flag: "✅ Green", reason: "Strong traction/ARR" };
-    }
-  }
-  // GTM
-  if (/go-?to-?market|gtm/.test(c)) {
-    if (
-      (score ?? 0) < 5 ||
-      /no gtm/i.test(justification)
-    ) {
-      return { flag: "🚩 Red", reason: "Score < 5 or no GTM plan" };
-    } else if ((score ?? 0) < 7) {
-      return { flag: "⚠️ Yellow", reason: "Score < 7 or incomplete GTM" };
-    } else if ((score ?? 0) >= 8) {
-      return { flag: "✅ Green", reason: "Score ≥ 8, clear GTM" };
-    }
-  }
-  // Risk / ESG
-  if (/risk|esg/.test(c)) {
-    if (
-      (score ?? 0) < 5 ||
-      /regulatory|legal|env.*risk.*not addressed/i.test(justification)
-    ) {
-      return { flag: "🚩 Red", reason: "Score < 5 or risk not addressed" };
-    } else if ((score ?? 0) < 7) {
-      return { flag: "⚠️ Yellow", reason: "Score < 7 or partial risk controls" };
-    } else if ((score ?? 0) >= 7) {
-      return { flag: "✅ Green", reason: "Good risk control/ESG" };
-    }
-  }
-  // Financials & Business Model
-  if (/financial|business model/.test(c)) {
-    if (
-      (score ?? 0) < 5 ||
-      /unsustainable|no revenue/i.test(justification)
-    ) {
-      return { flag: "🚩 Red", reason: "Score < 5 or no financial plan" };
-    } else if ((score ?? 0) < 7) {
-      return { flag: "⚠️ Yellow", reason: "Score < 7 or weak assumptions" };
-    } else if ((score ?? 0) >= 8) {
-      return { flag: "✅ Green", reason: "Strong business model/plan" };
-    }
-  }
-  // Exit
-  if (/exit/.test(c)) {
-    if (
-      (score ?? 0) < 5 ||
-      /no exit/i.test(justification)
-    ) {
-      return { flag: "🚩 Red", reason: "Score < 5 or no exit plan" };
-    } else if ((score ?? 0) < 7) {
-      return { flag: "⚠️ Yellow", reason: "Score < 7 or unclear exit" };
-    } else if ((score ?? 0) >= 7) {
-      return { flag: "✅ Green", reason: "Clear exit options" };
-    }
-  }
-  // Technology / Infra
-  if (/technology|infrastructure|tech stack/.test(c)) {
-    if (
-      (score ?? 0) < 5 ||
-      /not scalable|unverified/i.test(justification)
-    ) {
-      return { flag: "🚩 Red", reason: "Score < 5 or tech not scalable" };
-    } else if ((score ?? 0) < 7) {
-      return { flag: "⚠️ Yellow", reason: "Score < 7 or unclear stack" };
-    } else if ((score ?? 0) >= 8) {
-      return { flag: "✅ Green", reason: "Scalable & robust tech" };
-    }
-  }
-  // Market & Competition
-  if (/market|competition|t[a]?m/.test(c)) {
-    if (
-      (score ?? 0) < 5 ||
-      /high saturation|no moat/i.test(justification)
-    ) {
-      return { flag: "🚩 Red", reason: "Score < 5 or no market" };
-    } else if ((score ?? 0) < 7) {
-      return { flag: "⚠️ Yellow", reason: "Score < 7 or limited competition" };
-    } else if ((score ?? 0) >= 8) {
-      return { flag: "✅ Green", reason: "Strong market & moat" };
-    }
-  }
-  // FDA / Regulatory
-  if (/fda|regulatory/.test(c)) {
-    if (
-      (score ?? 0) < 5 ||
-      /no regulatory|no irb/i.test(justification)
-    ) {
-      return { flag: "🚩 Red", reason: "Score < 5 or no regulatory plan" };
-    } else if ((score ?? 0) < 7) {
-      return { flag: "⚠️ Yellow", reason: "Score < 7 or unclear pathway" };
-    } else if ((score ?? 0) >= 8) {
-      return { flag: "✅ Green", reason: "Clear regulatory plan" };
-    }
-  }
-  // Terms & Valuation
-  if (/terms|valuation/.test(c)) {
-    if (
-      (score ?? 0) < 5 ||
-      /restrictive|extreme cap/i.test(justification)
-    ) {
-      return { flag: "🚩 Red", reason: "Score < 5 or risky terms" };
-    } else if ((score ?? 0) < 7) {
-      return { flag: "⚠️ Yellow", reason: "Score < 7 or unclear strategy" };
-    } else if ((score ?? 0) >= 8) {
-      return { flag: "✅ Green", reason: "Healthy terms/valuation" };
-    }
-  }
-  // fallback
-  if ((score ?? 0) >= 8) return { flag: "✅ Green", reason: "Strong score" };
-  if ((score ?? 0) >= 5) return { flag: "⚠️ Yellow", reason: "Moderate score" };
-  if (score !== null && score !== undefined) return { flag: "🚩 Red", reason: "Low score" };
-  return { flag: "N/A", reason: "No score" };
-};
-
 
 
       const combineQuestionsAndAnswersToText = (
@@ -538,9 +154,8 @@ const getFlagAndReason = (
           body: JSON.stringify({ text: combinedText }),
         });
         const data = await res.json();
-
         console.log("API response data:", data);
-
+        if (data.scores) setScoreHistory(prev => [...prev, data.scores]);
 
         if (data.error) {
           alert(`Error: ${data.error}`);
@@ -556,22 +171,46 @@ const getFlagAndReason = (
 
 
 
-    const [files, setFiles] = useState<File[]>([]);
-     const inputRef = useRef<HTMLInputElement>(null);
+  const [files, setFiles] = useState<File[]>([]);
 
-  const handleAddFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setFiles(prev => [...prev, ...Array.from(e.target.files)]);
-    }
-  };
+  const renderScoreHistory = () => (
+  <div className="w-full max-w-3xl mt-10">
+    <h2 className="text-lg font-bold mb-3 text-gray-700">📖 Score History</h2>
+    {scoreHistory.length === 0 ? (
+      <div className="text-gray-500">No historical scores yet.</div>
+    ) : (
+      scoreHistory.map((scoreObj, idx) => (
+        <div key={idx} className="mb-6 border rounded-xl shadow bg-white p-4">
+          <div className="font-semibold text-indigo-600 mb-1">
+            Attempt #{idx + 1}
+            <span className="text-gray-500 text-xs ml-2">Avg: {getAvgScoresPerRun([scoreObj])[0].toFixed(1)}</span>
+          </div>
+          <table className="w-full border rounded bg-gray-50">
+            <thead>
+              <tr>
+                <th className="py-1 px-2">Factor</th>
+                <th className="py-1 px-2">Score</th>
+                <th className="py-1 px-2">Justification</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(scoreObj).map(([factor, value]: any) =>
+                value && typeof value === 'object' ? (
+                  <tr key={factor}>
+                    <td className="py-1 px-2">{factor}</td>
+                    <td className="py-1 px-2 font-bold">{typeof value.Score === 'number' ? value.Score : 'N/A'}</td>
+                    <td className="py-1 px-2">{value.Justification || 'No justification'}</td>
+                  </tr>
+                ) : null
+              )}
+            </tbody>
+          </table>
+        </div>
+      ))
+    )}
+  </div>
+);
 
-  const handleRemoveFile = (idx: number) => {
-    setFiles(prev => prev.filter((_, i) => i !== idx));
-  };
-
-  const triggerInput = () => {
-    inputRef.current?.click();
-  };
 
   const handleUpload = async () => {
     if (!files.length) return alert('Please select PDF files');
@@ -580,7 +219,7 @@ const getFlagAndReason = (
     setShowFullText(false);
 
     const formData = new FormData();
-    files.forEach(file => formData.append('files', file));
+    files.forEach(file => formData.append('files', file)); 
 
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/score`, {
@@ -770,8 +409,8 @@ const renderFlagSummary = () => {
 
 
 useEffect(() => {
-  console.log("reportData updated:", reportData);
-}, [reportData]);
+  console.log('Current scoreHistory:', scoreHistory);
+}, [scoreHistory]);
 
 
   return (
@@ -804,31 +443,22 @@ useEffect(() => {
 
       {mode === 'upload' && (
         <>
-           <div className="flex gap-4 mb-6">
-        <button
-          className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-xl text-lg font-bold"
-          onClick={triggerInput}
-        >
-          <span className="mr-2 text-xl">+</span> Add PDF
-        </button>
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".pdf"
-          multiple
-          onChange={handleAddFiles}
-          style={{ display: "none" }}
-        />
-        <button
-          onClick={handleUpload}
-          className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-lg font-semibold px-6 py-3 rounded-xl shadow-lg hover:scale-105 transition-transform duration-200"
-          disabled={loading}
-        >
-          {loading ? 'Uploading & Scoring...' : 'Extract & Score'}
-        </button>
-      </div>
-
-      <PdfFileList files={files} onRemove={handleRemoveFile} />
+          <label className="cursor-pointer bg-white border border-gray-300 rounded-lg px-6 py-3 shadow-md hover:bg-gray-100 transition">
+            <span className="text-gray-800 font-medium">{file ? `📄 ${file.name}` : '📄 Choose PDF File'}</span>
+            <input
+      type="file"
+      accept=".pdf"
+      multiple
+      onChange={e => setFiles(Array.from(e.target.files || []))}
+    />
+          </label>
+          <button
+            onClick={handleUpload}
+            className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-lg font-semibold px-6 py-3 rounded-xl shadow-lg hover:scale-105 transition-transform duration-200"
+            disabled={loading}
+          >
+            {loading ? 'Uploading & Scoring...' : 'Extract & Score'}
+          </button>
 
           {result?.preview_text && (
             <div className="max-w-2xl bg-white p-4 rounded shadow mt-6">
@@ -991,6 +621,10 @@ useEffect(() => {
           {reportLoading ? "Generating Report..." : "Generate AI Analysis Report"}
         </button>
 
+         {renderConsistencyCard()}
+
+         {renderScoreHistory()}
+
         {showReport && reportData && (
           <div className="w-full max-w-4xl space-y-8">
             <div className="bg-white rounded-2xl shadow-lg p-6">
@@ -1111,6 +745,7 @@ useEffect(() => {
             </div>
 
             {renderFlagSummary()} 
+           
 
             
           </div>

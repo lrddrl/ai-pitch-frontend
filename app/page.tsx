@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect,useRef} from 'react';
+import { useState, useEffect } from 'react';
 import ReactMarkdown from "react-markdown";
-import PdfFileList from './PdfFileList'; 
 
 
 interface ScoreItem {
@@ -14,37 +13,46 @@ interface ScoreItem {
   justification?: string;
 }
 
+interface ScoreObj {
+  [key: string]: {
+    Score?: number | null;
+    Color?: string;
+    Justification?: string;
+    [key: string]: any; 
+  }
+}
 
-// 收集每个评分历史的平均分
-function getAvgScoresPerRun(historyArr) {
-  return historyArr.map(scoresObj => {
-    const values = Object.values(scoresObj).map(v =>
-      typeof v.Score === 'number' ? v.Score : 0
-    );
+
+
+function getAvgScoresPerRun(historyArr: ScoreObj[]): number[] {
+  return historyArr.map((scoresObj) => {
+    const values = Object.values(scoresObj)
+      .map((v) => typeof v.Score === 'number' ? v.Score : 0);
     return values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
   });
 }
 
-// 统计低分domain数量
-function countLowDomains(scoresObj, threshold = 5) {
-  return Object.values(scoresObj).filter(v => typeof v.Score === 'number' && v.Score < threshold).length;
+
+function countLowDomains(scoresObj: ScoreObj, threshold = 5): number {
+  return Object.values(scoresObj)
+    .filter((v) => typeof v.Score === 'number' && v.Score < threshold)
+    .length;
 }
 
-// 计算评分历史的标准差
-function std(arr) {
+
+function std(arr: number[]): number {
   if (!arr.length) return 0;
   const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
   const sqDiff = arr.map(v => Math.pow(v - mean, 2));
   return Math.sqrt(sqDiff.reduce((a, b) => a + b, 0) / arr.length);
 }
 
-// 生成一致性标志
-function getConsistencyFlag(historyArr) {
+
+function getConsistencyFlag(historyArr: ScoreObj[]): { flag: string; reason: string } {
   if (historyArr.length === 0) return { flag: 'N/A', reason: 'No scores yet' };
   const avgs = getAvgScoresPerRun(historyArr);
   const deviation = std(avgs);
 
-  // 统计2+ domain低于5的历史评分数量
   const domainLowCounts = historyArr.map(obj => countLowDomains(obj, 5));
   const has2OrMoreLow = domainLowCounts.some(count => count >= 2);
 
@@ -59,7 +67,6 @@ function getConsistencyFlag(historyArr) {
   }
   return { flag: "✅ Green Flag", reason: "Balanced scores, std dev < 1.5" };
 }
-
 
 
 const categorizedPrompts: Record<string, { category: string; prompt: string }[]> = {
@@ -336,13 +343,14 @@ const categorizedPrompts: Record<string, { category: string; prompt: string }[]>
 
 
 export default function Home() {
+  const [scoreRuns, setScoreRuns] = useState<number[]>([]);
+  const [batchLoading, setBatchLoading] = useState(false);
+
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [showFullText, setShowFullText] = useState(false);
   const [showReport, setShowReport] = useState(false);
-
-  const [scoreHistory, setScoreHistory] = useState<any[]>([]);
 
   const [mode, setMode] = useState<'upload' | 'questions'>('upload');
       const questionPrompts = [
@@ -359,6 +367,33 @@ export default function Home() {
 
   const [reportData, setReportData] = useState<any>(null);
   const [reportLoading, setReportLoading] = useState(false);
+
+  const [scoreHistory, setScoreHistory] = useState<ScoreObj[]>([]);
+
+  const [consistencyResult, setConsistencyResult] = useState<any>(null);
+  const [consistencyLoading, setConsistencyLoading] = useState(false);
+
+
+
+  const consistencyFlag = getConsistencyFlag(scoreHistory);
+
+const renderConsistencyCard = () => (
+  <div className="bg-white rounded-2xl shadow-lg p-6 mt-6">
+    <h2 className="text-lg font-bold mb-2">📊 General Consistency</h2>
+    <div className="mb-1 text-xl font-semibold">{consistencyFlag.flag}</div>
+    <div className="text-gray-700">{consistencyFlag.reason}</div>
+    {scoreHistory.length > 0 && (
+      <div className="mt-2 text-sm text-gray-600">
+        <div>Number of scoring runs: {scoreHistory.length}</div>
+        <div>
+          Latest scores: {getAvgScoresPerRun(scoreHistory).map(s => s.toFixed(1)).join(', ')}
+        </div>
+        <div>Std. Deviation: {std(getAvgScoresPerRun(scoreHistory)).toFixed(2)}</div>
+      </div>
+    )}
+  </div>
+);
+
 
   const handleAnswerChange = (category: string, value: string) => {
   setAnswers(prev => ({ ...prev, [category]: value }));
@@ -587,11 +622,7 @@ const getFlagAndReason = (
           body: JSON.stringify({ text: combinedText }),
         });
         const data = await res.json();
-
-        console.log("API response data:", data);
-
-        if (data?.scores) setScoreHistory(prev => [...prev, data.scores]);
-
+     
         if (data.error) {
           alert(`Error: ${data.error}`);
         } else {
@@ -606,22 +637,46 @@ const getFlagAndReason = (
 
 
 
-    const [files, setFiles] = useState<File[]>([]);
-     const inputRef = useRef<HTMLInputElement>(null);
+  const [files, setFiles] = useState<File[]>([]);
 
-  const handleAddFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setFiles(prev => [...prev, ...Array.from(e.target.files)]);
-    }
-  };
+  const renderScoreHistory = () => (
+  <div className="w-full max-w-3xl mt-10">
+    <h2 className="text-lg font-bold mb-3 text-gray-700">📖 Score History</h2>
+    {scoreHistory.length === 0 ? (
+      <div className="text-gray-500">No historical scores yet.</div>
+    ) : (
+      scoreHistory.map((scoreObj, idx) => (
+        <div key={idx} className="mb-6 border rounded-xl shadow bg-white p-4">
+          <div className="font-semibold text-indigo-600 mb-1">
+            Attempt #{idx + 1}
+            <span className="text-gray-500 text-xs ml-2">Avg: {getAvgScoresPerRun([scoreObj])[0].toFixed(1)}</span>
+          </div>
+          <table className="w-full border rounded bg-gray-50">
+            <thead>
+              <tr>
+                <th className="py-1 px-2">Factor</th>
+                <th className="py-1 px-2">Score</th>
+                <th className="py-1 px-2">Justification</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(scoreObj).map(([factor, value]: any) =>
+                value && typeof value === 'object' ? (
+                  <tr key={factor}>
+                    <td className="py-1 px-2">{factor}</td>
+                    <td className="py-1 px-2 font-bold">{typeof value.Score === 'number' ? value.Score : 'N/A'}</td>
+                    <td className="py-1 px-2">{value.Justification || 'No justification'}</td>
+                  </tr>
+                ) : null
+              )}
+            </tbody>
+          </table>
+        </div>
+      ))
+    )}
+  </div>
+);
 
-  const handleRemoveFile = (idx: number) => {
-    setFiles(prev => prev.filter((_, i) => i !== idx));
-  };
-
-  const triggerInput = () => {
-    inputRef.current?.click();
-  };
 
   const handleUpload = async () => {
     if (!files.length) return alert('Please select PDF files');
@@ -630,7 +685,7 @@ const getFlagAndReason = (
     setShowFullText(false);
 
     const formData = new FormData();
-    files.forEach(file => formData.append('files', file));
+    files.forEach(file => formData.append('files', file)); 
 
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/score`, {
@@ -640,7 +695,11 @@ const getFlagAndReason = (
       const data = await res.json();
       setResult(data);
 
-      if (data.scores) setScoreHistory(prev => [...prev, data.scores]);
+        const avgScore = calculateTotalScore(data);
+        if (avgScore !== null && !isNaN(avgScore)) {
+          setScoreRuns(prev => [...prev, avgScore]);
+        }
+
     } catch (err) {
       alert('Failed to upload files');
     } finally {
@@ -649,18 +708,40 @@ const getFlagAndReason = (
   };
 
 
- const calculateTotalScore = () => {
-  if (!result?.scores) return null;
-  const scores = Object.values(result.scores)
+  const handleBatchScore = async () => {
+  setBatchLoading(true);
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/batch_score`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: result?.preview_text_full || "" }),
+    });
+    const data = await res.json();
+    if (data.scores && Array.isArray(data.scores)) {
+      setScoreRuns(prev => [...prev, ...data.scores.filter(x => typeof x === "number" && !isNaN(x))]);
+    }
+  } catch (e) {
+    alert("Batch scoring failed");
+  } finally {
+    setBatchLoading(false);
+  }
+};
+
+
+const calculateTotalScore = (input?: any): number | null => {
+  const scoresObj = input?.scores ?? result?.scores;
+  if (!scoresObj) return null;
+  const scores = Object.values(scoresObj)
     .map((v) => {
       const val = v as { Score?: number };
       return typeof val.Score === 'number' ? val.Score : 0;
     });
   if (scores.length === 0) return null;
-  const total = scores.reduce((a, b) => a + b, 0) ;
+  const total = scores.reduce((a, b) => a + b, 0);
   const avg = total / scores.length;
-  return avg.toFixed(1);
+  return Number(avg.toFixed(1));
 };
+
 
 const getFinalWeightedScore = () => {
   if (!reportData || !reportData.categories) return null;
@@ -789,6 +870,27 @@ const getFinalWeightedScore = () => {
   }
 };
 
+const handleAnalyzeConsistency = async () => {
+  if (!scoreRuns.length) {
+    alert('No score runs yet!');
+    return;
+  }
+  setConsistencyLoading(true);
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/consistency_analysis`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scoreRuns }),
+    });
+    const data = await res.json();
+    setConsistencyResult(data); 
+    alert('Analysis failed');
+  } finally {
+    setConsistencyLoading(false);
+  }
+};
+
+
 
 const renderFlagSummary = () => {
   if (!reportData || !reportData.categories) return null;
@@ -822,8 +924,8 @@ const renderFlagSummary = () => {
 
 
 useEffect(() => {
-  console.log("reportData updated:", reportData);
-}, [reportData]);
+  console.log('Current scoreHistory:', scoreHistory);
+}, [scoreHistory]);
 
 
   return (
@@ -856,31 +958,22 @@ useEffect(() => {
 
       {mode === 'upload' && (
         <>
-           <div className="flex gap-4 mb-6">
-        <button
-          className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-xl text-lg font-bold"
-          onClick={triggerInput}
-        >
-          <span className="mr-2 text-xl">+</span> Add PDF
-        </button>
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".pdf"
-          multiple
-          onChange={handleAddFiles}
-          style={{ display: "none" }}
-        />
-        <button
-          onClick={handleUpload}
-          className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-lg font-semibold px-6 py-3 rounded-xl shadow-lg hover:scale-105 transition-transform duration-200"
-          disabled={loading}
-        >
-          {loading ? 'Uploading & Scoring...' : 'Extract & Score'}
-        </button>
-      </div>
-
-      <PdfFileList files={files} onRemove={handleRemoveFile} />
+          <label className="cursor-pointer bg-white border border-gray-300 rounded-lg px-6 py-3 shadow-md hover:bg-gray-100 transition">
+            <span className="text-gray-800 font-medium">{file ? `📄 ${file.name}` : '📄 Choose PDF File'}</span>
+            <input
+              type="file"
+              accept=".pdf"
+              multiple
+              onChange={e => setFiles(Array.from(e.target.files || []))}
+            />
+          </label>
+          <button
+            onClick={handleUpload}
+            className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-lg font-semibold px-6 py-3 rounded-xl shadow-lg hover:scale-105 transition-transform duration-200"
+            disabled={loading}
+          >
+            {loading ? 'Uploading & Scoring...' : 'Extract & Score'}
+          </button>
 
           {result?.preview_text && (
             <div className="max-w-2xl bg-white p-4 rounded shadow mt-6">
@@ -1043,6 +1136,62 @@ useEffect(() => {
           {reportLoading ? "Generating Report..." : "Generate AI Analysis Report"}
         </button>
 
+         {/* {renderConsistencyCard()} */}
+
+         {/* {renderScoreHistory()} */}
+
+         <button
+          disabled={batchLoading}
+          onClick={handleBatchScore}
+          className="bg-orange-500 text-white px-4 py-2 rounded shadow hover:bg-orange-600 mb-4"
+        >
+          {batchLoading ? "Scoring 30 times..." : "Run 30 Scores"}
+        </button>
+
+
+         <div className="w-full max-w-xl mt-10">
+          <h2 className="text-lg font-bold mb-3 text-gray-700">📖 Total Score History~</h2>
+          {scoreRuns.length === 0 ? ( 
+            <div className="text-gray-500">No score history yet.</div>
+          ) : (
+            scoreRuns.map((score, idx) => (
+              <div key={idx} className="mb-2">
+                Attempt #{idx + 1}: <span className="font-mono text-indigo-700">{score}</span>
+              </div>
+            ))
+          )}
+        </div>
+
+        <button
+          className="bg-indigo-700 text-white px-4 py-2 rounded"
+          disabled={consistencyLoading || !scoreRuns.length}
+          onClick={handleAnalyzeConsistency}
+        >
+          {consistencyLoading ? "Analyzing..." : "Analyze Consistency"}
+        </button>
+
+        {consistencyResult && (
+          <div className="bg-white rounded-2xl shadow-lg p-6 mt-4">
+            <h3 className="font-bold mb-2 text-indigo-700">Subjectivity (Standard Deviation, higher means more subjective)</h3>
+            <pre className="text-xs bg-gray-50 p-2 rounded">
+              {JSON.stringify(consistencyResult.subjectivity, null, 2)}
+            </pre>
+            <h3 className="font-bold mt-4 mb-2 text-indigo-700">Subjectivity Summary (Average Subjectivity)</h3>
+            <pre className="text-xs bg-gray-50 p-2 rounded">
+              {JSON.stringify(consistencyResult.subjectivity_summary, null, 2)}
+            </pre>
+            <h3 className="font-bold mt-4 mb-2 text-indigo-700">Rubric Drift (Deviation from group mean by person and category)</h3>
+            <pre className="text-xs bg-gray-50 p-2 rounded">
+              {JSON.stringify(consistencyResult.rubric_drift, null, 2)}
+            </pre>
+            <h3 className="font-bold mt-4 mb-2 text-indigo-700">Rubric Drift Avg (Average Deviation)</h3>
+            <pre className="text-xs bg-gray-50 p-2 rounded">
+              {JSON.stringify(consistencyResult.rubric_drift_avg, null, 2)}
+            </pre>
+          </div>
+        )}
+
+
         {showReport && reportData && (
           <div className="w-full max-w-4xl space-y-8">
             <div className="bg-white rounded-2xl shadow-lg p-6">
@@ -1163,6 +1312,7 @@ useEffect(() => {
             </div>
 
             {renderFlagSummary()} 
+           
 
             
           </div>
