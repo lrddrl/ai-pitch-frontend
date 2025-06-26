@@ -5,6 +5,8 @@
   --foreground: #171717;
 }
 
+.pdf-export * { background-color: #fff !important; color: #222 !important; }
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

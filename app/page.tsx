@@ -1,17 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef  } from 'react';
 import ReactMarkdown from "react-markdown";
-
-
-interface ScoreItem {
-  Score?: number | null;
-  score?: number | null;
-  Color?: string;
-  color?: string;
-  Justification?: string;
-  justification?: string;
-}
+import PdfFileList from './PdfFileList'; 
+import ScoreRunHistory from './ScoreRunHistory';
+import GeneralConsistencyFlag from './GeneralConsistencyFlag';
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 interface ScoreObj {
   [key: string]: {
@@ -22,6 +17,20 @@ interface ScoreObj {
   }
 }
 
+type FlatScoreRecord = {
+  startup_id: number;
+  evaluator_id: number;
+  category: string;
+  score: number | null;
+};
+
+
+type ScoreRun = {
+  startup_id: number;
+  evaluator_id: number;
+  scores: Record<string, { Score?: number | null; Justification?: string }>;
+  totalScore: number | null;
+};
 
 
 function getAvgScoresPerRun(historyArr: ScoreObj[]): number[] {
@@ -30,42 +39,6 @@ function getAvgScoresPerRun(historyArr: ScoreObj[]): number[] {
       .map((v) => typeof v.Score === 'number' ? v.Score : 0);
     return values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
   });
-}
-
-
-function countLowDomains(scoresObj: ScoreObj, threshold = 5): number {
-  return Object.values(scoresObj)
-    .filter((v) => typeof v.Score === 'number' && v.Score < threshold)
-    .length;
-}
-
-
-function std(arr: number[]): number {
-  if (!arr.length) return 0;
-  const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
-  const sqDiff = arr.map(v => Math.pow(v - mean, 2));
-  return Math.sqrt(sqDiff.reduce((a, b) => a + b, 0) / arr.length);
-}
-
-
-function getConsistencyFlag(historyArr: ScoreObj[]): { flag: string; reason: string } {
-  if (historyArr.length === 0) return { flag: 'N/A', reason: 'No scores yet' };
-  const avgs = getAvgScoresPerRun(historyArr);
-  const deviation = std(avgs);
-
-  const domainLowCounts = historyArr.map(obj => countLowDomains(obj, 5));
-  const has2OrMoreLow = domainLowCounts.some(count => count >= 2);
-
-  if (deviation > 2.5 || has2OrMoreLow) {
-    return { flag: "🚩 Red Flag", reason: "Score std. deviation > 2.5 OR 2+ domains < 5" };
-  }
-  if (deviation > 1.5 || domainLowCounts.some(count => count >= 1)) {
-    return { flag: "⚠️ Yellow Flag", reason: "Std. dev > 1.5 OR 1 domain < 5" };
-  }
-  if (deviation < 1.5 && avgs.every(avg => avg >= 8)) {
-    return { flag: "✅ Green Flag", reason: "Balanced scores, std dev < 1.5 and all scores >8" };
-  }
-  return { flag: "✅ Green Flag", reason: "Balanced scores, std dev < 1.5" };
 }
 
 
@@ -343,7 +316,7 @@ const categorizedPrompts: Record<string, { category: string; prompt: string }[]>
 
 
 export default function Home() {
-  const [scoreRuns, setScoreRuns] = useState<number[]>([]);
+  const [scoreRuns, setScoreRuns] = useState<ScoreRun[]>([]);
   const [batchLoading, setBatchLoading] = useState(false);
 
   const [file, setFile] = useState<File | null>(null);
@@ -373,26 +346,57 @@ export default function Home() {
   const [consistencyResult, setConsistencyResult] = useState<any>(null);
   const [consistencyLoading, setConsistencyLoading] = useState(false);
 
+  const reportRef = useRef<HTMLDivElement>(null);
+
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const triggerInput = () => {
+    inputRef.current?.click();
+  };
 
 
-  const consistencyFlag = getConsistencyFlag(scoreHistory);
+  const handleRemoveFile = (idx: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== idx));
+  };
 
-const renderConsistencyCard = () => (
-  <div className="bg-white rounded-2xl shadow-lg p-6 mt-6">
-    <h2 className="text-lg font-bold mb-2">📊 General Consistency</h2>
-    <div className="mb-1 text-xl font-semibold">{consistencyFlag.flag}</div>
-    <div className="text-gray-700">{consistencyFlag.reason}</div>
-    {scoreHistory.length > 0 && (
-      <div className="mt-2 text-sm text-gray-600">
-        <div>Number of scoring runs: {scoreHistory.length}</div>
-        <div>
-          Latest scores: {getAvgScoresPerRun(scoreHistory).map(s => s.toFixed(1)).join(', ')}
-        </div>
-        <div>Std. Deviation: {std(getAvgScoresPerRun(scoreHistory)).toFixed(2)}</div>
-      </div>
-    )}
-  </div>
-);
+
+const handleExportPdf = async () => {
+  if (!reportRef.current) return;
+
+  const canvas = await html2canvas(reportRef.current, {
+    scale: 2,
+    useCORS: true
+  });
+  const imgData = canvas.toDataURL("image/png");
+
+  const pdf = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4"
+  });
+
+  const pdfWidth = 210; 
+  const pageHeight = 297; 
+  const imgProps = pdf.getImageProperties(imgData);
+  const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+  let heightLeft = imgHeight;
+  let position = 0;
+
+  pdf.addImage(imgData, "PNG", 0, position, pdfWidth, imgHeight);
+  heightLeft -= pageHeight;
+
+  while (heightLeft > 0) {
+    position -= pageHeight;
+    pdf.addPage();
+    pdf.addImage(imgData, "PNG", 0, position, pdfWidth, imgHeight);
+    heightLeft -= pageHeight;
+  }
+
+  pdf.save("report.pdf");
+};
+
+
+
 
 
   const handleAnswerChange = (category: string, value: string) => {
@@ -587,6 +591,14 @@ const getFlagAndReason = (
 };
 
 
+const getHistoricalAverageScore = () => {
+  if (!scoreRuns.length) return null;
+  const validScores = scoreRuns.map(run => typeof run.totalScore === 'number' ? run.totalScore : null).filter(v => v !== null);
+  if (!validScores.length) return null;
+  const avg = validScores.reduce((a, b) => a! + b!, 0) / validScores.length;
+  return avg.toFixed(1);
+};
+
 
       const combineQuestionsAndAnswersToText = (
         domain: string,
@@ -695,10 +707,18 @@ const getFlagAndReason = (
       const data = await res.json();
       setResult(data);
 
-        const avgScore = calculateTotalScore(data);
-        if (avgScore !== null && !isNaN(avgScore)) {
-          setScoreRuns(prev => [...prev, avgScore]);
-        }
+      if (data?.scores) {
+      const totalScore = calculateTotalScore({ scores: data.scores });
+      setScoreRuns(prev => [
+        ...prev,
+        {
+          startup_id: 1,
+          evaluator_id: prev.length + 1,
+          scores: data.scores,
+          totalScore: totalScore,
+        } as ScoreRun
+      ]);
+    }
 
     } catch (err) {
       alert('Failed to upload files');
@@ -706,6 +726,14 @@ const getFlagAndReason = (
       setLoading(false);
     }
   };
+
+
+ const handleAddFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const files = e.target.files;
+  if (files && files.length > 0) {
+    setFiles(prev => [...prev, ...Array.from(files)]);
+  }
+};
 
 
   const handleBatchScore = async () => {
@@ -717,8 +745,34 @@ const getFlagAndReason = (
       body: JSON.stringify({ text: result?.preview_text_full || "" }),
     });
     const data = await res.json();
-    if (data.scores && Array.isArray(data.scores)) {
-      setScoreRuns(prev => [...prev, ...data.scores.filter(x => typeof x === "number" && !isNaN(x))]);
+    if (data.score_records && Array.isArray(data.score_records)) {
+      const runsMap = new Map();
+      for (const record of data.score_records) {
+        const { startup_id, evaluator_id, category, score } = record;
+        if (!runsMap.has(evaluator_id)) {
+          runsMap.set(evaluator_id, {
+            startup_id,
+            evaluator_id,
+            scores: {},
+            totalScore: null
+          });
+        }
+        const run = runsMap.get(evaluator_id);
+        run.scores[category] = { Score: typeof score === 'number' ? score : null };
+      }
+
+      for (const run of runsMap.values()) {
+        const scoreArr = Object.values(run.scores).map(v => {
+          const val = v as { Score?: number };
+          return typeof val.Score === 'number' ? val.Score : 0;
+        });
+        run.totalScore = scoreArr.length ? Number((scoreArr.reduce((a, b) => a + b, 0) / scoreArr.length).toFixed(2)) : null;
+      }
+      setScoreRuns(prev => {
+        const next = [...prev, ...Array.from(runsMap.values())];
+        console.log('setScoreRuns after batch:', next); // Debug
+        return next;
+      });
     }
   } catch (e) {
     alert("Batch scoring failed");
@@ -726,6 +780,8 @@ const getFlagAndReason = (
     setBatchLoading(false);
   }
 };
+
+
 
 
 const calculateTotalScore = (input?: any): number | null => {
@@ -752,34 +808,16 @@ const getFinalWeightedScore = () => {
   return finalScore.toFixed(2); 
 };
 
-  const renderScoreRow = (factor: string, value: any) => {
-    if (!value || typeof value !== 'object') return null; 
-    return (
-      <tr key={factor} className="hover:bg-indigo-50 transition">
-        <td className="py-2 px-3 font-medium">{factor}</td>
-        <td
-          className={`py-2 px-3 font-bold ${
-            value.Color === 'Green'
-              ? 'text-green-600'
-              : value.Color === 'Yellow'
-              ? 'text-yellow-600'
-              : value.Color === 'Red'
-              ? 'text-red-600'
-              : 'text-gray-600'
-          }`}
-        >
-          {typeof value.Score === 'number' ? value.Score : 'N/A'}
-        </td>
-        <td className="py-2 px-3">{value.Justification || 'No justification provided'}</td>
-      </tr>
-    );
-  };
-
   const renderScoreTable = () => (
     <div className="w-full max-w-3xl mt-6">
       <div className="flex justify-between items-center mb-3">
         <h2 className="text-lg font-semibold text-gray-700">TCA Factor Scoring</h2>
-        <div className="text-indigo-700 font-bold text-xl">Total Score: {calculateTotalScore() ?? '--'}</div>
+        <div className="text-indigo-700 font-bold text-xl">
+        Score: {calculateTotalScore() ?? '--'}
+        </div>
+        <div className="text-gray-600 font-semibold text-base mt-1">
+          Historical Avg Score: {getHistoricalAverageScore() ?? '--'}
+        </div>
       </div>
       <table className="w-full border rounded-lg bg-white shadow">
         <thead>
@@ -884,10 +922,51 @@ const handleAnalyzeConsistency = async () => {
     });
     const data = await res.json();
     setConsistencyResult(data); 
-    alert('Analysis failed');
   } finally {
     setConsistencyLoading(false);
   }
+};
+
+
+const renderSubjectivityTable = (subjectivity:any) => {
+  const categories = Object.keys(subjectivity || {});
+  if (categories.length === 0) return <div>No subjectivity data.</div>;
+  const allEvaluators = Object.keys(subjectivity[categories[0]] || {});
+  return (
+    <div className="overflow-x-auto mt-4">
+      <table className="min-w-full border rounded bg-white shadow">
+        <thead>
+          <tr>
+            <th className="py-2 px-3 border-b bg-indigo-100 text-left">Category</th>
+            {allEvaluators.map(eid => (
+              <th key={eid} className="py-2 px-3 border-b text-xs">E{eid}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {categories.map(cat => (
+            <tr key={cat} className="hover:bg-indigo-50">
+              <td className="py-2 px-3 font-semibold text-indigo-800">{cat}</td>
+              {allEvaluators.map(eid => {
+                const v = subjectivity[cat][eid];
+                return (
+                  <td
+                    key={eid}
+                    className={`py-2 px-3 text-center font-mono ${v > 0 ? 'text-orange-600 font-bold' : 'text-gray-500'}`}
+                  >
+                    {typeof v === "number" ? v.toFixed(2) : '-'}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="text-sm text-gray-500 mt-2">
+        <span className="font-bold text-orange-600">Orange numbers</span> indicate standard deviation &gt; 0 (higher subjectivity).
+      </p>
+    </div>
+  );
 };
 
 
@@ -909,8 +988,8 @@ const renderFlagSummary = () => {
                 {cat.category} — <span>{flag}</span>
               </div>
               <div className="text-gray-700">
-                <span className="font-semibold">{flag}：</span>
-                {reason}（scores: <strong>{cat.score ?? "--"}</strong>）
+                <span className="font-semibold">{flag}:</span>
+                {reason}(scores: <strong>{cat.score ?? "--"}</strong>)
                 <br />
                 <span>{details}</span>
               </div>
@@ -958,22 +1037,31 @@ useEffect(() => {
 
       {mode === 'upload' && (
         <>
-          <label className="cursor-pointer bg-white border border-gray-300 rounded-lg px-6 py-3 shadow-md hover:bg-gray-100 transition">
-            <span className="text-gray-800 font-medium">{file ? `📄 ${file.name}` : '📄 Choose PDF File'}</span>
-            <input
-              type="file"
-              accept=".pdf"
-              multiple
-              onChange={e => setFiles(Array.from(e.target.files || []))}
-            />
-          </label>
-          <button
-            onClick={handleUpload}
-            className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-lg font-semibold px-6 py-3 rounded-xl shadow-lg hover:scale-105 transition-transform duration-200"
-            disabled={loading}
-          >
-            {loading ? 'Uploading & Scoring...' : 'Extract & Score'}
-          </button>
+             <div className="flex gap-4 mb-6">
+              <button
+                className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-xl text-lg font-bold"
+                onClick={triggerInput}
+              >
+                <span className="mr-2 text-xl">+</span> Add PDF
+              </button>
+              <input
+                ref={inputRef}
+                type="file"
+                accept=".pdf"
+                multiple
+                onChange={handleAddFiles}
+                style={{ display: "none" }}
+              />
+              <button
+                onClick={handleUpload}
+                className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-lg font-semibold px-6 py-3 rounded-xl shadow-lg hover:scale-105 transition-transform duration-200"
+                disabled={loading}
+              >
+                {loading ? 'Uploading & Scoring...' : 'Extract & Score'}
+              </button>
+            </div>
+
+          <PdfFileList files={files} onRemove={handleRemoveFile} />
 
           {result?.preview_text && (
             <div className="max-w-2xl bg-white p-4 rounded shadow mt-6">
@@ -1113,18 +1201,7 @@ useEffect(() => {
 
 
       <div className="flex gap-4 mt-4">
-        <button
-          className="bg-green-600 text-white px-4 py-2 rounded"
-          // onClick={() => { /* exportCsv handler */ }}
-        >
-          Export Scores CSV
-        </button>
-        <button
-          className="bg-blue-600 text-white px-4 py-2 rounded"
-          // onClick={exportPdf}
-        >
-          Export Report PDF
-        </button>
+     
       </div>
 
       <div className="p-6 bg-gray-50 min-h-screen flex flex-col items-center">
@@ -1135,8 +1212,6 @@ useEffect(() => {
         >
           {reportLoading ? "Generating Report..." : "Generate AI Analysis Report"}
         </button>
-
-         {/* {renderConsistencyCard()} */}
 
          {/* {renderScoreHistory()} */}
 
@@ -1149,18 +1224,9 @@ useEffect(() => {
         </button>
 
 
-         <div className="w-full max-w-xl mt-10">
-          <h2 className="text-lg font-bold mb-3 text-gray-700">📖 Total Score History~</h2>
-          {scoreRuns.length === 0 ? ( 
-            <div className="text-gray-500">No score history yet.</div>
-          ) : (
-            scoreRuns.map((score, idx) => (
-              <div key={idx} className="mb-2">
-                Attempt #{idx + 1}: <span className="font-mono text-indigo-700">{score}</span>
-              </div>
-            ))
-          )}
-        </div>
+         <ScoreRunHistory scoreRuns={scoreRuns} />
+
+         
 
         <button
           className="bg-indigo-700 text-white px-4 py-2 rounded"
@@ -1169,6 +1235,10 @@ useEffect(() => {
         >
           {consistencyLoading ? "Analyzing..." : "Analyze Consistency"}
         </button>
+
+        <h3 className="font-bold mb-2 text-indigo-700">Subjectivity (Standard Deviation, higher means more subjective)</h3>
+{consistencyResult?.subjectivity && renderSubjectivityTable(consistencyResult.subjectivity)}
+
 
         {consistencyResult && (
           <div className="bg-white rounded-2xl shadow-lg p-6 mt-4">
@@ -1192,8 +1262,19 @@ useEffect(() => {
         )}
 
 
+           
+
         {showReport && reportData && (
-          <div className="w-full max-w-4xl space-y-8">
+          <>
+          <button
+            onClick={handleExportPdf}
+            className="mb-4 bg-blue-600 text-white px-4 py-2 rounded shadow"
+          >
+            Export Report PDF
+          </button>
+            <div ref={reportRef} 
+             className="w-full max-w-4xl space-y-8 pdf-export" 
+            >
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <h2 className="text-xl font-bold mb-4">🔍 Quick Summary</h2>
               <div className="grid grid-cols-2 gap-4">
@@ -1312,10 +1393,15 @@ useEffect(() => {
             </div>
 
             {renderFlagSummary()} 
-           
 
+            <GeneralConsistencyFlag scoreRuns={scoreRuns} />
             
-          </div>
+            </div>
+            {/* <div ref={reportRef} style={{background:'#fff', color:'#000'}}>
+            Test Content
+          </div> */}
+          </>
+          
         )}
       </div>
     </div>
