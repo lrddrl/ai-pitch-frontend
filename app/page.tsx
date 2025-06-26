@@ -690,44 +690,6 @@ const getHistoricalAverageScore = () => {
 );
 
 
-  const handleUpload = async () => {
-    if (!files.length) return alert('Please select PDF files');
-    setLoading(true);
-    setResult(null);
-    setShowFullText(false);
-
-    const formData = new FormData();
-    files.forEach(file => formData.append('files', file)); 
-
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/score`, {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await res.json();
-      setResult(data);
-
-      if (data?.scores) {
-      const totalScore = calculateTotalScore({ scores: data.scores });
-      setScoreRuns(prev => [
-        ...prev,
-        {
-          startup_id: 1,
-          evaluator_id: prev.length + 1,
-          scores: data.scores,
-          totalScore: totalScore,
-        } as ScoreRun
-      ]);
-    }
-
-    } catch (err) {
-      alert('Failed to upload files');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-
  const handleAddFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
   const files = e.target.files;
   if (files && files.length > 0) {
@@ -735,14 +697,13 @@ const getHistoricalAverageScore = () => {
   }
 };
 
-
-  const handleBatchScore = async () => {
+const handleBatchScore = async (text:any) => {
   setBatchLoading(true);
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/batch_score`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: result?.preview_text_full || "" }),
+      body: JSON.stringify({ text: text || "" }),
     });
     const data = await res.json();
     if (data.score_records && Array.isArray(data.score_records)) {
@@ -758,9 +719,8 @@ const getHistoricalAverageScore = () => {
           });
         }
         const run = runsMap.get(evaluator_id);
-        run.scores[category] = { Score: typeof score === 'number' ? score : null };
+        run.scores[category] = { Score: typeof score === 'number' ? score : 0 };
       }
-
       for (const run of runsMap.values()) {
         const scoreArr = Object.values(run.scores).map(v => {
           const val = v as { Score?: number };
@@ -768,11 +728,8 @@ const getHistoricalAverageScore = () => {
         });
         run.totalScore = scoreArr.length ? Number((scoreArr.reduce((a, b) => a + b, 0) / scoreArr.length).toFixed(2)) : null;
       }
-      setScoreRuns(prev => {
-        const next = [...prev, ...Array.from(runsMap.values())];
-        console.log('setScoreRuns after batch:', next); // Debug
-        return next;
-      });
+      // Use callback to append batch runs to existing score history
+      setScoreRuns(prev => [...prev, ...Array.from(runsMap.values())]);
     }
   } catch (e) {
     alert("Batch scoring failed");
@@ -780,6 +737,55 @@ const getHistoricalAverageScore = () => {
     setBatchLoading(false);
   }
 };
+
+const handleUpload = async () => {
+  if (!files.length) return alert('Please select PDF files');
+  setLoading(true);
+  setResult(null);
+  setShowFullText(false);
+
+  const formData = new FormData();
+  files.forEach(file => formData.append('files', file));
+
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/score`, {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await res.json();
+    setResult(data);
+
+    if (data?.scores) {
+      const totalScore = calculateTotalScore({ scores: data.scores });
+      // Always add this scoring run to the history!
+      setScoreRuns(prev => [
+        ...prev,
+        {
+          startup_id: 1,
+          evaluator_id: prev.length + 1,
+          scores: data.scores,
+          totalScore: totalScore,
+        } as ScoreRun
+      ]);
+    }
+
+    // If history is less than 5, also trigger batch scoring for more records
+    if (data?.preview_text_full && data.preview_text_full.length >= 50) {
+      // IMPORTANT: Wait a tick for setScoreRuns above if you want accurate count, or just check length after batch
+      setTimeout(() => {
+        if (typeof scoreRuns !== 'undefined' && scoreRuns.length < 5) {
+          handleBatchScore(data.preview_text_full);
+        }
+      }, 0);
+    }
+
+  } catch (err) {
+    alert('Failed to upload files');
+  } finally {
+    setLoading(false);
+  }
+};
+
 
 
 
