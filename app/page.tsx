@@ -818,11 +818,11 @@ const getFinalWeightedScore = () => {
     <div className="w-full max-w-3xl mt-6">
       <div className="flex justify-between items-center mb-3">
         <h2 className="text-lg font-semibold text-gray-700">TCA Factor Scoring</h2>
-        <div className="text-indigo-700 font-bold text-xl">
-        Score: {calculateTotalScore() ?? '--'}
-        </div>
+        {/* <div className="text-indigo-700 font-bold text-xl">
+        {calculateTotalScore() ?? '--'}
+        </div> */}
         <div className="text-gray-600 font-semibold text-base mt-1">
-          Historical Avg Score: {getHistoricalAverageScore() ?? '--'}
+         {calculateTotalScore() ?? '--'} /  Avg Score: {getHistoricalAverageScore() ?? '--'}
         </div>
       </div>
       <table className="w-full border rounded-lg bg-white shadow">
